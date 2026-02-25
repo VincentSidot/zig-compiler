@@ -1,0 +1,7 @@
+zig-out/
+compiled/
+.zig-cache/
+.vscode/
+temp/
+
+*.bin
