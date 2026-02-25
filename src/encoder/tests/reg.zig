@@ -9,15 +9,15 @@ const RegisterIndex_64 = reg_file.RegisterIndex_64;
 const Scale = reg_file.Scale;
 const Index = reg_file.Index;
 const Memory = reg_file.Memory;
-const RegMem64 = reg_file.RegMem(RegisterIndex_64);
+const RegisterMemory_64 = reg_file.RegisterMemory_64;
 
 test "RegMem validate accepts register operand" {
-    const op: RegMem64 = .{ .reg = .RAX };
+    const op: RegisterMemory_64 = .{ .reg = .RAX };
     try op.validate();
 }
 
 test "RegMem validate accepts base/index memory operand" {
-    const op: RegMem64 = .{
+    const op: RegisterMemory_64 = .{
         .mem = .{
             .baseIndex = .{
                 .base = .RAX,
@@ -31,7 +31,7 @@ test "RegMem validate accepts base/index memory operand" {
 }
 
 test "RegMem validate accepts RIP-relative memory operand" {
-    const op: RegMem64 = .{
+    const op: RegisterMemory_64 = .{
         .mem = .{
             .ripRelative = .{
                 .disp = 32,
@@ -43,7 +43,7 @@ test "RegMem validate accepts RIP-relative memory operand" {
 }
 
 test "RegMem validate rejects RSP as index register" {
-    const op: RegMem64 = .{
+    const op: RegisterMemory_64 = .{
         .mem = .{
             .baseIndex = .{
                 .base = .RAX,
@@ -56,7 +56,7 @@ test "RegMem validate rejects RSP as index register" {
 }
 
 test "RegMem validate rejects R12 as index register" {
-    const op: RegMem64 = .{
+    const op: RegisterMemory_64 = .{
         .mem = .{
             .baseIndex = .{
                 .base = .RAX,

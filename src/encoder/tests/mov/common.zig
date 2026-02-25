@@ -9,10 +9,16 @@ const mov_file = @import("../../mov.zig");
 pub const mov = mov_file.mov;
 pub const EncodingError = lib_file.EncodingError;
 
+// Index registers
 pub const RegisterIndex_64 = lib_file.RegisterIndex_64;
 pub const RegisterIndex_32 = lib_file.RegisterIndex_32;
 pub const RegisterIndex_16 = lib_file.RegisterIndex_16;
 pub const RegisterIndex_8 = lib_file.RegisterIndex_8;
+// Memory operands
+pub const RegisterMemory_64 = lib_file.RegisterMemory_64;
+pub const RegisterMemory_32 = lib_file.RegisterMemory_32;
+pub const RegisterMemory_16 = lib_file.RegisterMemory_16;
+pub const RegisterMemory_8 = lib_file.RegisterMemory_8;
 
 fn print_buffer(comptime prefix: []const u8, buff: []const u8) void {
     eprintf(prefix ++ ": ", .{});
@@ -22,18 +28,18 @@ fn print_buffer(comptime prefix: []const u8, buff: []const u8) void {
     eprintf("\n", .{});
 }
 
-fn fn_mov(comptime D: type, comptime S: type) type {
-    return fn (writer: *std.io.Writer, dest: D, source: S) EncodingError!usize;
+fn fn_mov(comptime Dest: type, comptime Src: type) type {
+    return fn (writer: *std.io.Writer, dest: Dest, source: Src) EncodingError!usize;
 }
 
 pub fn validate(
-    comptime D: type,
-    comptime S: type,
+    comptime Dest: type,
+    comptime Src: type,
     comptime name: []const u8,
     comptime expected: []const u8,
-    tested: fn_mov(D, S),
-    dest: D,
-    source: S,
+    tested: fn_mov(Dest, Src),
+    dest: Dest,
+    source: Src,
 ) !void {
     eprintf("Validating MOV \"{s}\" instruction: ", .{name});
 

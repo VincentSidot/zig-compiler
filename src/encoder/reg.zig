@@ -1,18 +1,18 @@
 const error_file = @import("error.zig");
 const EncodingError = error_file.EncodingError;
 
-fn factory_reg_low3(comptime T: type) fn (value: T) u3 {
+fn factory_reg_low3(comptime T: type) fn (value: T) callconv(.@"inline") u3 {
     return struct {
-        fn inner(value: T) u3 {
+        inline fn inner(value: T) u3 {
             const intValue: u8 = @intFromEnum(value);
             return @intCast(intValue & 0b111);
         }
     }.inner;
 }
 
-fn factory_is_extended(comptime T: type) fn (value: T) bool {
+fn factory_is_extended(comptime T: type) fn (value: T) callconv(.@"inline") bool {
     return struct {
-        fn inner(value: T) bool {
+        inline fn inner(value: T) bool {
             const intValue: u8 = @intFromEnum(value);
             return (intValue & 0b1000) != 0;
         }
@@ -20,6 +20,8 @@ fn factory_is_extended(comptime T: type) fn (value: T) bool {
 }
 
 pub const RegisterIndex_64 = enum(u8) {
+    const Self = @This();
+
     // General-purpose registers
     RAX = 0,
     RCX = 1,
@@ -39,19 +41,21 @@ pub const RegisterIndex_64 = enum(u8) {
     R14 = 14,
     R15 = 15,
 
-    pub inline fn need_rex(_: @This()) bool {
+    pub inline fn need_rex(_: Self) bool {
         return true;
     }
 
-    pub fn is_high_register(_: @This()) bool {
+    pub inline fn is_high_register(_: Self) bool {
         return false; // 64-bit registers don't have high byte variants
     }
 
-    pub const reg_low3 = factory_reg_low3(@This());
-    pub const is_extended = factory_is_extended(@This());
+    pub const reg_low3 = factory_reg_low3(Self);
+    pub const is_extended = factory_is_extended(Self);
 };
 
 pub const RegisterIndex_32 = enum(u8) {
+    const Self = @This();
+
     // General-purpose registers
     EAX = 0,
     ECX = 1,
@@ -71,19 +75,21 @@ pub const RegisterIndex_32 = enum(u8) {
     R14D = 14,
     R15D = 15,
 
-    pub fn need_rex(self: @This()) bool {
+    pub inline fn need_rex(self: Self) bool {
         return self.is_extended();
     }
 
-    pub fn is_high_register(_: @This()) bool {
+    pub inline fn is_high_register(_: Self) bool {
         return false; // 32-bit registers don't have high byte variants
     }
 
-    pub const reg_low3 = factory_reg_low3(@This());
-    pub const is_extended = factory_is_extended(@This());
+    pub const reg_low3 = factory_reg_low3(Self);
+    pub const is_extended = factory_is_extended(Self);
 };
 
 pub const RegisterIndex_16 = enum(u8) {
+    const Self = @This();
+
     // General-purpose registers
     AX = 0,
     CX = 1,
@@ -103,19 +109,21 @@ pub const RegisterIndex_16 = enum(u8) {
     R14W = 14,
     R15W = 15,
 
-    pub fn need_rex(self: @This()) bool {
+    pub inline fn need_rex(self: Self) bool {
         return self.is_extended();
     }
 
-    pub fn is_high_register(_: @This()) bool {
+    pub inline fn is_high_register(_: Self) bool {
         return false; // 16-bit registers don't have high byte variants
     }
 
-    pub const reg_low3 = factory_reg_low3(@This());
-    pub const is_extended = factory_is_extended(@This());
+    pub const reg_low3 = factory_reg_low3(Self);
+    pub const is_extended = factory_is_extended(Self);
 };
 
 pub const RegisterIndex_8 = enum(u9) {
+    const Self = @This();
+
     // General-purpose registers
     AL = 0,
     CL = 1,
@@ -144,21 +152,21 @@ pub const RegisterIndex_8 = enum(u9) {
     R14B = 14,
     R15B = 15,
 
-    pub fn need_rex(self: @This()) bool {
+    pub inline fn need_rex(self: Self) bool {
         return self == .SPL or self == .BPL or self == .SIL or self == .DIL or self.is_extended();
     }
 
-    pub fn is_high_register(self: @This()) bool {
+    pub inline fn is_high_register(self: Self) bool {
         const value: u9 = @intFromEnum(self);
         return (value & 0b1_0000) != 0;
     }
 
-    pub fn reg_low3(self: @This()) u3 {
+    pub fn reg_low3(self: Self) u3 {
         const intValue: u8 = @intCast(@intFromEnum(self) & 0b1111);
         return @intCast(intValue & 0b0111);
     }
 
-    pub fn is_extended(self: @This()) bool {
+    pub fn is_extended(self: Self) bool {
         const value: u9 = @intFromEnum(self);
 
         return (value & 0b0_1000) != 0;
@@ -227,14 +235,74 @@ pub const Memory = union(enum) {
 
 pub fn RegMem(comptime R: type) type {
     return union(enum) {
+        const Self = @This();
         reg: R,
         mem: Memory,
 
-        pub inline fn validate(self: @This()) EncodingError!void {
+        pub inline fn validate(self: Self) EncodingError!void {
             return switch (self) {
                 .reg => |_| {},
                 .mem => |mem| mem.validate(),
             };
         }
+
+        pub inline fn need_rex(self: Self) bool {
+            return switch (self) {
+                .reg => |r| r.need_rex(),
+                .mem => |_| {
+                    // Not implemented yet
+                    @panic("Memory operand REX prefix check not implemented");
+                },
+            };
+        }
+
+        pub inline fn is_high_register(self: Self) bool {
+            return switch (self) {
+                .reg => |r| r.is_high_register(),
+                .mem => |_| false, // Memory operands cannot be high registers
+            };
+        }
+
+        pub inline fn is_extended(self: Self) bool {
+            return switch (self) {
+                .reg => |r| r.is_extended(),
+                .mem => |_| {
+                    // Not implemented yet
+                    @panic("Memory operand extended register check not implemented");
+                },
+            };
+        }
+
+        pub inline fn reg_low3(self: Self) u3 {
+            return switch (self) {
+                .reg => |r| r.reg_low3(),
+                .mem => |_| {
+                    // Not implemented yet
+                    @panic("Memory operand reg_low3 not implemented");
+                },
+            };
+        }
+    };
+}
+
+pub const RegisterMemory_64 = RegMem(RegisterIndex_64);
+pub const RegisterMemory_32 = RegMem(RegisterIndex_32);
+pub const RegisterMemory_16 = RegMem(RegisterIndex_16);
+pub const RegisterMemory_8 = RegMem(RegisterIndex_8);
+
+pub fn is_memory_register(comptime Reg: type) bool {
+    return comptime switch (Reg) {
+        RegisterMemory_64, RegisterMemory_32, RegisterMemory_16, RegisterMemory_8 => true,
+        else => false,
+    };
+}
+
+pub fn fetch_index_register(comptime Mem: type) type {
+    return comptime switch (Mem) {
+        RegisterMemory_64 => RegisterIndex_64,
+        RegisterMemory_32 => RegisterIndex_32,
+        RegisterMemory_16 => RegisterIndex_16,
+        RegisterMemory_8 => RegisterIndex_8,
+        else => @compileError("Unsupported memory type for index register extraction"),
     };
 }

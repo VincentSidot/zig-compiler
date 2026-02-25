@@ -20,7 +20,28 @@ pub const std_options: std.Options = .{
     .log_level = .debug,
 };
 
+fn Maker(comptime T: type) type {
+    return union(enum) {
+        const Self = @This();
+
+        a: T,
+        b: usize,
+
+        inline fn makeA(value: T) Self {
+            return Self{ .a = value };
+        }
+
+        inline fn makeB(value: usize) Self {
+            return Self{ .b = value };
+        }
+    };
+}
+
 pub fn main() !void {
+    printf("Hello, World!\n", .{});
+}
+
+pub fn main2() !void {
     printf("Hello, World!\n", .{});
 
     // Prints to stderr, ignoring potential errors.

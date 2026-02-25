@@ -10,6 +10,10 @@ pub const RegisterIndex_64 = reg_file.RegisterIndex_64;
 pub const RegisterIndex_32 = reg_file.RegisterIndex_32;
 pub const RegisterIndex_16 = reg_file.RegisterIndex_16;
 pub const RegisterIndex_8 = reg_file.RegisterIndex_8;
+pub const RegisterMemory_64 = reg_file.RegisterMemory_64;
+pub const RegisterMemory_32 = reg_file.RegisterMemory_32;
+pub const RegisterMemory_16 = reg_file.RegisterMemory_16;
+pub const RegisterMemory_8 = reg_file.RegisterMemory_8;
 
 test {
     const std = @import("std");

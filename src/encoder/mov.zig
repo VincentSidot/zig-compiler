@@ -22,10 +22,19 @@ const error_file = @import("error.zig");
 const EncodingError = error_file.EncodingError;
 
 const register = @import("reg.zig");
+
 const Register64 = register.RegisterIndex_64;
 const Register32 = register.RegisterIndex_32;
 const Register16 = register.RegisterIndex_16;
 const Register8 = register.RegisterIndex_8;
+
+const RegisterMemory64 = register.RegisterMemory_64;
+const RegisterMemory32 = register.RegisterMemory_32;
+const RegisterMemory16 = register.RegisterMemory_16;
+const RegisterMemory8 = register.RegisterMemory_8;
+
+const is_memory_register = register.is_memory_register;
+const fetch_index_register = register.fetch_index_register;
 
 const Register16_LegacyPrefix = 0x66;
 
@@ -92,9 +101,25 @@ const MOV_OPCODE = struct {
 
 const Writer = std.io.Writer;
 
-fn factory_mov(comptime R: type, comptime opcode: u8, comptime is_dest_rm: bool) fn (writer: *Writer, dest: R, source: R) EncodingError!usize {
+fn factory_mov(
+    comptime Dst: type,
+    comptime Src: type,
+    comptime opcode: u8,
+) fn (writer: *Writer, dest: Dst, source: Src) EncodingError!usize {
+    const dest_is_rm = comptime is_memory_register(Dst);
+
+    const Reg = comptime if (dest_is_rm) Src else Dst;
+    const Mem = comptime if (dest_is_rm) Dst else Src;
+
+    if (fetch_index_register(Mem) != Reg) {
+        @compileError("Source and Destination registers should be same register class");
+    }
+
+    const is_16bit = Reg == Register16;
+    const is_64bit = Reg == Register64;
+
     const factory = struct {
-        fn _inner(writer: *Writer, dest: R, source: R) EncodingError!usize {
+        fn _inner(writer: *Writer, dest: Dst, source: Src) EncodingError!usize {
             var writen: usize = 0;
 
             if (source.is_high_register() and dest.need_rex()) {
@@ -105,18 +130,10 @@ fn factory_mov(comptime R: type, comptime opcode: u8, comptime is_dest_rm: bool)
                 return error.InvalidOperand;
             }
 
-            if (R == Register16) {
-                // For 16-bit registers, we need to add legacy prefix
-                writen += 1;
-                writer.writeByte(Register16_LegacyPrefix) catch {
-                    return EncodingError.WriterError;
-                };
-            }
+            var reg: Reg = undefined;
+            var rm: Mem = undefined;
 
-            var reg: R = undefined;
-            var rm: R = undefined;
-
-            if (is_dest_rm) {
+            if (dest_is_rm) {
                 reg = source;
                 rm = dest;
             } else {
@@ -124,9 +141,17 @@ fn factory_mov(comptime R: type, comptime opcode: u8, comptime is_dest_rm: bool)
                 rm = source;
             }
 
+            if (is_16bit) {
+                // For 16-bit registers, we need to add legacy prefix
+                writen += 1;
+                writer.writeByte(Register16_LegacyPrefix) catch {
+                    return EncodingError.WriterError;
+                };
+            }
+
             if (source.need_rex() or dest.need_rex()) {
                 const rex = rex_bytes(
-                    R == Register64, // w bit is set for 64-bit operand size
+                    is_64bit, // w bit is set for 64-bit operand size
                     reg.is_extended(),
                     false, // x bit is not used for MOV reg-reg
                     rm.is_extended(),
@@ -158,12 +183,30 @@ fn factory_mov(comptime R: type, comptime opcode: u8, comptime is_dest_rm: bool)
     return factory._inner;
 }
 
-fn factory_mov_imm(comptime R: type, comptime T: type, comptime opcode: u8, comptime is_dest_rm: bool) fn (writer: *Writer, dest: R, source: T) EncodingError!usize {
+fn factory_mov_imm(comptime Dst: type, comptime Src: type, comptime opcode: u8) fn (writer: *Writer, dest: Dst, source: Src) EncodingError!usize {
+    const dest_is_rm = comptime is_memory_register(Dst);
+
+    const is_16bit = comptime blk: {
+        if (is_memory_register(Dst)) {
+            break :blk fetch_index_register(Dst) == Register16;
+        } else {
+            break :blk Dst == Register16;
+        }
+    };
+
+    const is_64bit = comptime blk: {
+        if (is_memory_register(Dst)) {
+            break :blk fetch_index_register(Dst) == Register64;
+        } else {
+            break :blk Dst == Register64;
+        }
+    };
+
     const factory = struct {
-        fn _inner(writer: *Writer, dest: R, source: T) EncodingError!usize {
+        fn _inner(writer: *Writer, dest: Dst, source: Src) EncodingError!usize {
             var writen: usize = 0;
 
-            if (R == Register16) {
+            if (is_16bit) {
                 // For 16-bit registers, we need to add legacy prefix
                 writen += 1;
                 writer.writeByte(Register16_LegacyPrefix) catch {
@@ -173,7 +216,7 @@ fn factory_mov_imm(comptime R: type, comptime T: type, comptime opcode: u8, comp
 
             if (dest.need_rex()) {
                 const rex = rex_bytes(
-                    R == Register64, // w bit is set for 64-bit operand size
+                    is_64bit, // w bit is set for 64-bit operand size
                     false,
                     false,
                     dest.is_extended(),
@@ -185,7 +228,7 @@ fn factory_mov_imm(comptime R: type, comptime T: type, comptime opcode: u8, comp
                 };
             }
 
-            if (is_dest_rm) {
+            if (dest_is_rm) {
                 const modrm = modrm_byte(
                     0b11,
                     0,
@@ -208,8 +251,8 @@ fn factory_mov_imm(comptime R: type, comptime T: type, comptime opcode: u8, comp
             }
 
             // Write the immediate value in little-endian format
-            writen += @sizeOf(T);
-            writer.writeInt(T, source, .little) catch {
+            writen += @sizeOf(Src);
+            writer.writeInt(Src, source, .little) catch {
                 return EncodingError.WriterError;
             };
 
@@ -221,25 +264,31 @@ fn factory_mov_imm(comptime R: type, comptime T: type, comptime opcode: u8, comp
 }
 
 pub const mov = struct {
-    pub const rm8_r8 = factory_mov(Register8, MOV_OPCODE.MOV_RM8_R8, true);
-    pub const r8_rm8 = factory_mov(Register8, MOV_OPCODE.MOV_R8_RM8, false);
-    pub const rm8_imm8 = factory_mov_imm(Register8, u8, MOV_OPCODE.MOV_RM8_IMM8, true);
-    pub const r8_imm8 = factory_mov_imm(Register8, u8, MOV_OPCODE.MOV_R8_IMM8, false);
+    // This won't compile for now - it's okay since we are working on the factory logic for now.
 
-    pub const rm16_r16 = factory_mov(Register16, MOV_OPCODE.MOV_RM16_R16, true);
-    pub const r16_rm16 = factory_mov(Register16, MOV_OPCODE.MOV_R16_RM16, false);
-    pub const rm16_imm16 = factory_mov_imm(Register16, u16, MOV_OPCODE.MOV_RM16_IMM16, true);
-    pub const r16_imm16 = factory_mov_imm(Register16, u16, MOV_OPCODE.MOV_R16_IMM16, false);
+    pub const rm8_r8 = factory_mov(
+        RegisterMemory8,
+        Register8,
+        MOV_OPCODE.MOV_RM8_R8,
+    );
+    pub const r8_rm8 = factory_mov(Register8, RegisterMemory8, MOV_OPCODE.MOV_R8_RM8);
+    pub const rm8_imm8 = factory_mov_imm(RegisterMemory8, u8, MOV_OPCODE.MOV_RM8_IMM8);
+    pub const r8_imm8 = factory_mov_imm(Register8, u8, MOV_OPCODE.MOV_R8_IMM8);
 
-    pub const rm32_r32 = factory_mov(Register32, MOV_OPCODE.MOV_RM32_R32, true);
-    pub const r32_rm32 = factory_mov(Register32, MOV_OPCODE.MOV_R32_RM32, false);
-    pub const rm32_imm32 = factory_mov_imm(Register32, u32, MOV_OPCODE.MOV_RM32_IMM32, true);
-    pub const r32_imm32 = factory_mov_imm(Register32, u32, MOV_OPCODE.MOV_R32_IMM32, false);
+    pub const rm16_r16 = factory_mov(RegisterMemory16, Register16, MOV_OPCODE.MOV_RM16_R16);
+    pub const r16_rm16 = factory_mov(Register16, RegisterMemory16, MOV_OPCODE.MOV_R16_RM16);
+    pub const rm16_imm16 = factory_mov_imm(RegisterMemory16, u16, MOV_OPCODE.MOV_RM16_IMM16);
+    pub const r16_imm16 = factory_mov_imm(Register16, u16, MOV_OPCODE.MOV_R16_IMM16);
 
-    pub const rm64_r64 = factory_mov(Register64, MOV_OPCODE.MOV_RM64_R64, true);
-    pub const r64_rm64 = factory_mov(Register64, MOV_OPCODE.MOV_R64_RM64, false);
-    pub const rm64_imm32 = factory_mov_imm(Register64, u32, MOV_OPCODE.MOV_RM64_IMM64, true);
-    pub const r64_imm64 = factory_mov_imm(Register64, u64, MOV_OPCODE.MOV_R64_IMM64, false);
+    pub const rm32_r32 = factory_mov(RegisterMemory32, Register32, MOV_OPCODE.MOV_RM32_R32);
+    pub const r32_rm32 = factory_mov(Register32, RegisterMemory32, MOV_OPCODE.MOV_R32_RM32);
+    pub const rm32_imm32 = factory_mov_imm(RegisterMemory32, u32, MOV_OPCODE.MOV_RM32_IMM32);
+    pub const r32_imm32 = factory_mov_imm(Register32, u32, MOV_OPCODE.MOV_R32_IMM32);
+
+    pub const rm64_r64 = factory_mov(RegisterMemory64, Register64, MOV_OPCODE.MOV_RM64_R64);
+    pub const r64_rm64 = factory_mov(Register64, RegisterMemory64, MOV_OPCODE.MOV_R64_RM64);
+    pub const rm64_imm32 = factory_mov_imm(RegisterMemory64, u32, MOV_OPCODE.MOV_RM64_IMM64);
+    pub const r64_imm64 = factory_mov_imm(Register64, u64, MOV_OPCODE.MOV_R64_IMM64);
 
     pub fn r64_imm64_auto(writer: *Writer, dest: Register64, source: u64) EncodingError!usize {
         if (fits_signext32_range(source)) {
@@ -253,7 +302,7 @@ pub const mov = struct {
                 converted = @intCast(shifted & 0xFFFF_FFFF);
             }
 
-            return mov.rm64_imm32(writer, dest, converted);
+            return mov.rm64_imm32(writer, RegisterMemory64{ .reg = dest }, converted);
         } else {
             return mov.r64_imm64(writer, dest, source);
         }
