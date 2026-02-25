@@ -1,7 +1,9 @@
+const std = @import("std");
 const common = @import("common.zig");
 
 const mov = common.mov;
 const validate = common.validate;
+const EncodingError = common.EncodingError;
 const RegisterIndex_16 = common.RegisterIndex_16;
 
 test "MOV 16 bit registers" {
@@ -28,6 +30,20 @@ test "MOV 16 bit registers extended" {
     try validate(RegisterIndex_16, RegisterIndex_16, "R15W, R8W", &.{ 0x66, 0x45, 0x89, 0xC7 }, mov.rm16_r16, .R15W, .R8W);
 }
 
+test "MOV 16 bit registers reverse encoding" {
+    // 66 8b c1                mov    ax,cx
+    // 66 44 8b c0             mov    r8w,ax
+    try validate(RegisterIndex_16, RegisterIndex_16, "AX, CX", &.{ 0x66, 0x8B, 0xC1 }, mov.r16_rm16, .AX, .CX);
+    try validate(RegisterIndex_16, RegisterIndex_16, "R8W, AX", &.{ 0x66, 0x44, 0x8B, 0xC0 }, mov.r16_rm16, .R8W, .AX);
+}
+
+test "MOV 16 bit immediate to r/m16 encoding" {
+    // 66 c7 c0 34 12          mov    ax,0x1234
+    // 66 41 c7 c1 78 56       mov    r9w,0x5678
+    try validate(RegisterIndex_16, u16, "AX, 0x1234", &.{ 0x66, 0xC7, 0xC0, 0x34, 0x12 }, mov.rm16_imm16, .AX, 0x1234);
+    try validate(RegisterIndex_16, u16, "R9W, 0x5678", &.{ 0x66, 0x41, 0xC7, 0xC1, 0x78, 0x56 }, mov.rm16_imm16, .R9W, 0x5678);
+}
+
 test "MOV 16 bit immediate to register" {
     // 66 b8 ff 00             mov    ax,0x00_ff
     // 66 b9 ff f0             mov    cx,0xf0_ff
@@ -52,4 +68,13 @@ test "MOV 16 bit immediate to register extended" {
     try validate(RegisterIndex_16, u16, "R9W, 0x00_00", &.{ 0x66, 0x41, 0xB9, 0x00, 0x00 }, mov.r16_imm16, .R9W, 0x0000);
     try validate(RegisterIndex_16, u16, "R12W, 0x0F_0F", &.{ 0x66, 0x41, 0xBC, 0x0F, 0x0F }, mov.r16_imm16, .R12W, 0x0F0F);
     try validate(RegisterIndex_16, u16, "R13W, 0xF0_F0", &.{ 0x66, 0x41, 0xBD, 0xF0, 0xF0 }, mov.r16_imm16, .R13W, 0xF0F0);
+}
+
+test "MOV 16 bit writer errors" {
+    var buffer: [0]u8 = undefined;
+    var writer = std.io.Writer.fixed(&buffer);
+    try std.testing.expectError(EncodingError.WriterError, mov.rm16_r16(&writer, .AX, .CX));
+    try std.testing.expectError(EncodingError.WriterError, mov.r16_rm16(&writer, .AX, .CX));
+    try std.testing.expectError(EncodingError.WriterError, mov.rm16_imm16(&writer, .AX, 0x1234));
+    try std.testing.expectError(EncodingError.WriterError, mov.r16_imm16(&writer, .AX, 0x1234));
 }

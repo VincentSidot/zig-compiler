@@ -1,7 +1,9 @@
+const std = @import("std");
 const common = @import("common.zig");
 
 const mov = common.mov;
 const validate = common.validate;
+const EncodingError = common.EncodingError;
 const RegisterIndex_64 = common.RegisterIndex_64;
 
 test "MOV 64 bit registers" {
@@ -36,6 +38,27 @@ test "MOV 64 bit registers extended" {
     try validate(RegisterIndex_64, RegisterIndex_64, "R12, R13", &.{ 0x4D, 0x89, 0xEC }, mov.rm64_r64, .R12, .R13);
 }
 
+test "MOV 64 bit registers reverse encoding" {
+    // 48 8b c1                mov    rax,rcx
+    // 4c 8b c0                mov    r8,rax
+    try validate(RegisterIndex_64, RegisterIndex_64, "RAX, RCX", &.{ 0x48, 0x8B, 0xC1 }, mov.r64_rm64, .RAX, .RCX);
+    try validate(RegisterIndex_64, RegisterIndex_64, "R8, RAX", &.{ 0x4C, 0x8B, 0xC0 }, mov.r64_rm64, .R8, .RAX);
+}
+
+test "MOV 64 bit immediate to r/m64 encoding" {
+    // 48 c7 c0 78 56 34 12    mov    rax,0x12345678
+    // 49 c7 c1 78 56 34 12    mov    r9,0x12345678
+    try validate(RegisterIndex_64, u32, "RAX, 0x1234_5678", &.{ 0x48, 0xC7, 0xC0, 0x78, 0x56, 0x34, 0x12 }, mov.rm64_imm32, .RAX, 0x1234_5678);
+    try validate(RegisterIndex_64, u32, "R9, 0x1234_5678", &.{ 0x49, 0xC7, 0xC1, 0x78, 0x56, 0x34, 0x12 }, mov.rm64_imm32, .R9, 0x1234_5678);
+}
+
+test "MOV 64 bit immediate64 direct encoding" {
+    // 48 b8 88 77 66 55 44 33 22 11    movabs rax,0x1122334455667788
+    // 49 b9 08 07 06 05 04 03 02 01    movabs r9,0x0102030405060708
+    try validate(RegisterIndex_64, u64, "RAX, 0x1122_3344_5566_7788", &.{ 0x48, 0xB8, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11 }, mov.r64_imm64, .RAX, 0x1122_3344_5566_7788);
+    try validate(RegisterIndex_64, u64, "R9, 0x0102_0304_0506_0708", &.{ 0x49, 0xB9, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01 }, mov.r64_imm64, .R9, 0x0102_0304_0506_0708);
+}
+
 test "MOV 64 bit immediate to register" {
     // 48 c7 c7 ff 00 00 00             mov    rdi,0xff
     // 48 c7 c0 0c 00 00 00             mov    rax,0xc
@@ -60,4 +83,23 @@ test "MOV 64 bit immediate to register extended" {
     try validate(RegisterIndex_64, u64, "R15, 0xEFFF_1234_1234_1234", &.{ 0x49, 0xBF, 0x34, 0x12, 0x34, 0x12, 0x34, 0x12, 0xFF, 0xEF }, mov.r64_imm64_auto, .R15, 0xEFFF_1234_1234_1234);
     try validate(RegisterIndex_64, u64, "R12, 0x0", &.{ 0x49, 0xC7, 0xC4, 0x00, 0x00, 0x00, 0x00 }, mov.r64_imm64_auto, .R12, 0x0000_0000_0000_0000);
     try validate(RegisterIndex_64, u64, "R13, 0xF0F0_F0F0_F0F0_F000", &.{ 0x49, 0xBD, 0xF0, 0xDE, 0xBC, 0x9A, 0x78, 0x56, 0x34, 0x12 }, mov.r64_imm64_auto, .R13, 0x1234_5678_9ABC_DEF0);
+}
+
+test "MOV 64 bit immediate auto boundary values" {
+    // 48 c7 c0 ff ff ff 7f    mov    rax,0x7fffffff
+    // 48 b8 00 00 00 80 00 00 00 00    movabs rax,0x80000000
+    // 48 c7 c0 00 00 00 80    mov    rax,0xffffffff80000000
+    try validate(RegisterIndex_64, u64, "RAX, 0x0000_0000_7FFF_FFFF", &.{ 0x48, 0xC7, 0xC0, 0xFF, 0xFF, 0xFF, 0x7F }, mov.r64_imm64_auto, .RAX, 0x0000_0000_7FFF_FFFF);
+    try validate(RegisterIndex_64, u64, "RAX, 0x0000_0000_8000_0000", &.{ 0x48, 0xB8, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00 }, mov.r64_imm64_auto, .RAX, 0x0000_0000_8000_0000);
+    try validate(RegisterIndex_64, u64, "RAX, 0xFFFF_FFFF_8000_0000", &.{ 0x48, 0xC7, 0xC0, 0x00, 0x00, 0x00, 0x80 }, mov.r64_imm64_auto, .RAX, 0xFFFF_FFFF_8000_0000);
+}
+
+test "MOV 64 bit writer errors" {
+    var buffer: [0]u8 = undefined;
+    var writer = std.io.Writer.fixed(&buffer);
+    try std.testing.expectError(EncodingError.WriterError, mov.rm64_r64(&writer, .RAX, .RCX));
+    try std.testing.expectError(EncodingError.WriterError, mov.r64_rm64(&writer, .RAX, .RCX));
+    try std.testing.expectError(EncodingError.WriterError, mov.rm64_imm32(&writer, .RAX, 0x1234_5678));
+    try std.testing.expectError(EncodingError.WriterError, mov.r64_imm64(&writer, .RAX, 0x1122_3344_5566_7788));
+    try std.testing.expectError(EncodingError.WriterError, mov.r64_imm64_auto(&writer, .RAX, 0x0000_0000_0000_0001));
 }

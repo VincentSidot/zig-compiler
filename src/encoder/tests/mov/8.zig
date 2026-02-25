@@ -42,6 +42,15 @@ test "MOV 8 bit registers extended" {
     try validate(RegisterIndex_8, RegisterIndex_8, "R15B, R8B", &.{ 0x45, 0x88, 0xC7 }, mov.rm8_r8, .R15B, .R8B);
 }
 
+test "MOV 8 bit registers reverse encoding" {
+    // 8a c1                   mov    al,cl
+    // 41 8a c0                mov    al,r8b
+    // 44 8a cb                mov    r9b,bl
+    try validate(RegisterIndex_8, RegisterIndex_8, "AL, CL", &.{ 0x8A, 0xC1 }, mov.r8_rm8, .AL, .CL);
+    try validate(RegisterIndex_8, RegisterIndex_8, "AL, R8B", &.{ 0x41, 0x8A, 0xC0 }, mov.r8_rm8, .AL, .R8B);
+    try validate(RegisterIndex_8, RegisterIndex_8, "R9B, BL", &.{ 0x44, 0x8A, 0xCB }, mov.r8_rm8, .R9B, .BL);
+}
+
 test "MOV 8 bit invalid combinations" {
     // High byte registers cannot be used with REX prefix
     var buffer: [0]u8 = undefined;
@@ -51,6 +60,12 @@ test "MOV 8 bit invalid combinations" {
     try std.testing.expectError(EncodingError.InvalidOperand, mov.rm8_r8(&writer, .SPL, .AH));
     try std.testing.expectError(EncodingError.InvalidOperand, mov.rm8_r8(&writer, .BH, .R8B));
     try std.testing.expectError(EncodingError.InvalidOperand, mov.rm8_r8(&writer, .R8B, .BH));
+
+    // Same invalid matrix for reverse encoding path (r8, r/m8).
+    try std.testing.expectError(EncodingError.InvalidOperand, mov.r8_rm8(&writer, .AH, .SPL));
+    try std.testing.expectError(EncodingError.InvalidOperand, mov.r8_rm8(&writer, .SPL, .AH));
+    try std.testing.expectError(EncodingError.InvalidOperand, mov.r8_rm8(&writer, .BH, .R8B));
+    try std.testing.expectError(EncodingError.InvalidOperand, mov.r8_rm8(&writer, .R8B, .BH));
 }
 
 test "MOV 8 bit immediate to register" {
@@ -77,4 +92,26 @@ test "MOV 8 bit immediate to register extended" {
     try validate(RegisterIndex_8, u8, "R9B, 0x00", &.{ 0x41, 0xB1, 0x00 }, mov.r8_imm8, .R9B, 0x00);
     try validate(RegisterIndex_8, u8, "R12B, 0xAF", &.{ 0x41, 0xB4, 0xAF }, mov.r8_imm8, .R12B, 0xAF);
     try validate(RegisterIndex_8, u8, "R8B, 0x42 // Using MOV r/m8, imm8 encoding", &.{ 0x41, 0xC6, 0xC0, 0x42 }, mov.rm8_imm8, .R8B, 0x42);
+}
+
+test "MOV 8 bit immediate low and high-byte edge cases" {
+    // 40 b4 11                mov    spl,0x11
+    // 40 b5 22                mov    bpl,0x22
+    // 40 b6 33                mov    sil,0x33
+    // 40 b7 44                mov    dil,0x44
+    // c6 c4 55                mov    ah,0x55
+    try validate(RegisterIndex_8, u8, "SPL, 0x11", &.{ 0x40, 0xB4, 0x11 }, mov.r8_imm8, .SPL, 0x11);
+    try validate(RegisterIndex_8, u8, "BPL, 0x22", &.{ 0x40, 0xB5, 0x22 }, mov.r8_imm8, .BPL, 0x22);
+    try validate(RegisterIndex_8, u8, "SIL, 0x33", &.{ 0x40, 0xB6, 0x33 }, mov.r8_imm8, .SIL, 0x33);
+    try validate(RegisterIndex_8, u8, "DIL, 0x44", &.{ 0x40, 0xB7, 0x44 }, mov.r8_imm8, .DIL, 0x44);
+    try validate(RegisterIndex_8, u8, "AH, 0x55", &.{ 0xC6, 0xC4, 0x55 }, mov.rm8_imm8, .AH, 0x55);
+}
+
+test "MOV 8 bit writer errors" {
+    var buffer: [0]u8 = undefined;
+    var writer = std.io.Writer.fixed(&buffer);
+    try std.testing.expectError(EncodingError.WriterError, mov.rm8_r8(&writer, .AL, .CL));
+    try std.testing.expectError(EncodingError.WriterError, mov.r8_rm8(&writer, .AL, .CL));
+    try std.testing.expectError(EncodingError.WriterError, mov.rm8_imm8(&writer, .AL, 0x11));
+    try std.testing.expectError(EncodingError.WriterError, mov.r8_imm8(&writer, .AL, 0x11));
 }
