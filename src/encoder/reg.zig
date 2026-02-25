@@ -1,3 +1,6 @@
+const error_file = @import("error.zig");
+const EncodingError = error_file.EncodingError;
+
 fn factory_reg_low3(comptime T: type) fn (value: T) u3 {
     return struct {
         fn inner(value: T) u3 {
@@ -162,22 +165,76 @@ pub const RegisterIndex_8 = enum(u9) {
     }
 };
 
-pub const Memory_Offset = enum {
-    B0,
+pub const Scale = enum(u2) {
+    x1 = 0,
+    x2 = 1,
+    x4 = 2,
+    x8 = 3,
 };
 
-pub fn Register_Memory(comptime R: type) type {
-    return struct { reg: R, offset: Memory_Offset };
-}
+pub const Index = struct {
+    reg: RegisterIndex_64,
+    scale: Scale = .x1,
 
-pub fn Register_Ext(comptime R: type) type {
+    pub inline fn validate(self: Index) EncodingError!void {
+        if (self.reg == .RSP or self.reg == .R12) {
+            return EncodingError.InvalidIndexRegister;
+        }
+    }
+};
+
+/// Represents a memory operand in x86-64 assembly, which can be of the form:
+/// [base + index*scale + disp] or [RIP + disp] for RIP-relative addressing.
+/// - base: Optional base register (e.g., RAX, RBX)
+/// - index: Optional index register (e.g., RAX, RBX)
+/// - scale: Scale factor for the index register (1, 2, 4, or 8)
+/// - disp: Displacement (can be positive or negative)
+///
+/// # Notes:
+/// - RSP/R12 cannot be used as index registers.
+pub const BaseIndexMemory = struct {
+    base: ?RegisterIndex_64 = null, // Base register (optional)
+    index: ?Index = null, // Index register (optional)
+    disp: i32 = 0, // Displacement (can be positive or negative)
+
+    pub inline fn validate(self: BaseIndexMemory) EncodingError!void {
+        if (self.index) |idx| {
+            try idx.validate();
+        }
+    }
+};
+
+pub const RipRelativeMemory = struct {
+    disp: i32 = 0, // Displacement for RIP-relative addressing
+
+    pub inline fn validate(self: RipRelativeMemory) EncodingError!void {
+        _ = self;
+        // No specific validation needed for RIP-relative addressing.
+    }
+};
+
+pub const Memory = union(enum) {
+    baseIndex: BaseIndexMemory,
+    ripRelative: RipRelativeMemory,
+
+    pub inline fn validate(self: Memory) EncodingError!void {
+        return switch (self) {
+            .baseIndex => |mem| mem.validate(),
+            .ripRelative => |mem| mem.validate(),
+        };
+    }
+};
+
+pub fn RegMem(comptime R: type) type {
     return union(enum) {
         reg: R,
-        memory: struct {
-            reg: R,
-            offset: i32,
-        },
-        relative: i32,
-        absolute: u64,
+        mem: Memory,
+
+        pub inline fn validate(self: @This()) EncodingError!void {
+            return switch (self) {
+                .reg => |_| {},
+                .mem => |mem| mem.validate(),
+            };
+        }
     };
 }

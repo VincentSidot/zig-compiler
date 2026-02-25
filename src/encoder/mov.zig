@@ -18,8 +18,8 @@ const log = if (builtin.is_test)
 else
     std.log.scoped(.clock);
 
-const lib = @import("lib.zig");
-const EncodingError = lib.EncodingError;
+const error_file = @import("error.zig");
+const EncodingError = error_file.EncodingError;
 
 const register = @import("reg.zig");
 const Register64 = register.RegisterIndex_64;
