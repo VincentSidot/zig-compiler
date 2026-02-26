@@ -7,8 +7,7 @@ const mov_64 = @import("mov/64.zig");
 
 test {
     std.testing.refAllDecls(mov_8);
-    // They are deactivated during the mov_factory rework, to be updated later
-    // std.testing.refAllDecls(mov_16);
-    // std.testing.refAllDecls(mov_32);
-    // std.testing.refAllDecls(mov_64);
+    std.testing.refAllDecls(mov_16);
+    std.testing.refAllDecls(mov_32);
+    std.testing.refAllDecls(mov_64);
 }
