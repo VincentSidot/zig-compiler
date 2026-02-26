@@ -1,3 +1,6 @@
+const std = @import("std");
+const Writer = std.io.Writer;
+
 const error_file = @import("error.zig");
 const EncodingError = error_file.EncodingError;
 
@@ -233,7 +236,7 @@ pub const Memory = union(enum) {
     }
 };
 
-pub fn RegMem(comptime R: type) type {
+fn RegMem(comptime R: type) type {
     return union(enum) {
         const Self = @This();
         reg: R,
@@ -272,16 +275,6 @@ pub fn RegMem(comptime R: type) type {
                 },
             };
         }
-
-        pub inline fn reg_low3(self: Self) u3 {
-            return switch (self) {
-                .reg => |r| r.reg_low3(),
-                .mem => |_| {
-                    // Not implemented yet
-                    @panic("Memory operand reg_low3 not implemented");
-                },
-            };
-        }
     };
 }
 
@@ -290,19 +283,123 @@ pub const RegisterMemory_32 = RegMem(RegisterIndex_32);
 pub const RegisterMemory_16 = RegMem(RegisterIndex_16);
 pub const RegisterMemory_8 = RegMem(RegisterIndex_8);
 
-pub fn is_memory_register(comptime Reg: type) bool {
-    return comptime switch (Reg) {
-        RegisterMemory_64, RegisterMemory_32, RegisterMemory_16, RegisterMemory_8 => true,
-        else => false,
-    };
+pub fn is_memory_register(comptime T: type) bool {
+    const name = @typeName(T);
+    return std.mem.indexOf(u8, name, "RegMem(") != null;
+}
+
+pub fn is_index_register(comptime T: type) bool {
+    const name = @typeName(T);
+    return std.mem.indexOf(u8, name, "RegisterIndex_") != null;
 }
 
 pub fn fetch_index_register(comptime Mem: type) type {
-    return comptime switch (Mem) {
-        RegisterMemory_64 => RegisterIndex_64,
-        RegisterMemory_32 => RegisterIndex_32,
-        RegisterMemory_16 => RegisterIndex_16,
-        RegisterMemory_8 => RegisterIndex_8,
-        else => @compileError("Unsupported memory type for index register extraction"),
-    };
+    ensure_mem_reg(Mem);
+
+    inline for (@typeInfo(Mem).@"union".fields) |field| {
+        if (std.mem.eql(u8, field.name, "reg")) return field.type;
+    }
+
+    @compileError("Unable to extract register type from memory register union");
+}
+
+pub fn ensure_mem_reg(comptime Mem: type) void {
+    comptime {
+        if (!is_memory_register(Mem)) {
+            const memTypeName = @typeName(Mem);
+            const errorMessage = std.fmt.comptimePrint(
+                "Expected a memory register type, but got: {s}",
+                .{memTypeName},
+            );
+            @compileError(errorMessage);
+        }
+    }
+}
+
+pub fn ensure_index_reg(comptime Reg: type) void {
+    comptime {
+        if (!is_index_register(Reg)) {
+            const regTypeName = @typeName(Reg);
+            const errorMessage = std.fmt.comptimePrint(
+                "Expected an index register type, but got: {s}",
+                .{regTypeName},
+            );
+
+            @compileError(errorMessage);
+        }
+    }
+}
+
+pub fn ensure_matching_reg(comptime Mem: type, comptime Reg: type) void {
+    comptime {
+        if (fetch_index_register(Mem) != Reg) {
+            const memTypeName = @typeName(Mem);
+            const regTypeName = @typeName(Reg);
+            const errorMessage = std.fmt.comptimePrint(
+                "The reg operand type ({s}) must match the index register type of the memory operand ({s})",
+                .{ regTypeName, memTypeName },
+            );
+
+            @compileError(errorMessage);
+        }
+    }
+}
+
+/// ModRM byte encoding:
+/// mod: addressing mode (2 bits)
+/// reg: register operand (3 bits)
+/// rm: r/m operand (3 bits)
+fn modrm(mod: u8, reg3: u8, rm3: u8) u8 {
+    // mod (2 bits) in bits 7..6
+    // reg (3 bits) in bits 5..3
+    // rm  (3 bits) in bits 2..0
+    return ((mod & 0x3) << 6) | ((reg3 & 0x7) << 3) | (rm3 & 0x7);
+}
+
+pub fn emit_modrm_sib(
+    /// Reg operand type (e.g., RegisterIndex_64, RegisterIndex_32, etc.)
+    /// Note: You can also use void if you want to force a 0 in the reg field
+    /// of the ModR/M byte, which is useful for certain instructions that don't
+    /// use the reg field.
+    comptime Reg: type,
+    comptime Mem: type,
+    writer: *Writer,
+    /// In case of Reg being void, pass undefined here to satisfy the type
+    /// system, but it will be ignored.
+    reg: Reg,
+    rm: Mem,
+) EncodingError!usize {
+    // Comptime type validation to ensure correct usage of the function.
+    ensure_mem_reg(Mem);
+    if (Reg != void) {
+        ensure_index_reg(Reg);
+        ensure_matching_reg(Mem, Reg);
+    }
+
+    switch (rm) {
+        .reg => |rm_reg| {
+            const mod = 0b11; // Register addressing mode
+            var reg3: u3 = undefined;
+
+            if (Reg != void) {
+                reg3 = reg.reg_low3();
+            } else {
+                // If Reg is void, we set reg3 to 0, which is often used for
+                // instructions that don't utilize the reg field.
+                reg3 = 0;
+            }
+
+            const rm3 = rm_reg.reg_low3();
+            const modrm_byte = modrm(mod, reg3, rm3);
+
+            writer.writeByte(modrm_byte) catch {
+                return EncodingError.WriterError;
+            };
+            return 1; // Number of bytes written
+        },
+        .mem => |rm_mem| {
+            _ = rm_mem; // Not implemented yet, but this is where we would handle memory operand encoding.
+            @panic("Memory operand encoding not implemented yet");
+        },
+    }
 }

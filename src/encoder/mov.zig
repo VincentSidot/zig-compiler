@@ -35,6 +35,8 @@ const RegisterMemory8 = register.RegisterMemory_8;
 
 const is_memory_register = register.is_memory_register;
 const fetch_index_register = register.fetch_index_register;
+const emit_modrm_sib = register.emit_modrm_sib;
+const ensure_matching_reg = register.ensure_matching_reg;
 
 const Register16_LegacyPrefix = 0x66;
 
@@ -51,17 +53,6 @@ fn rex_bytes(w: bool, r: bool, x: bool, b: bool) u8 {
     if (x) v |= 0b0010;
     if (b) v |= 0b0001;
     return v;
-}
-
-/// ModRM byte encoding:
-/// mod: addressing mode (2 bits)
-/// reg: register operand (3 bits)
-/// rm: r/m operand (3 bits)
-fn modrm_byte(mod: u8, reg3: u8, rm3: u8) u8 {
-    // mod (2 bits) in bits 7..6
-    // reg (3 bits) in bits 5..3
-    // rm  (3 bits) in bits 2..0
-    return ((mod & 0x3) << 6) | ((reg3 & 0x7) << 3) | (rm3 & 0x7);
 }
 
 fn movimm_byte(opcode: u8, reg_low3: u8) u8 {
@@ -111,9 +102,7 @@ fn factory_mov(
     const Reg = comptime if (dest_is_rm) Src else Dst;
     const Mem = comptime if (dest_is_rm) Dst else Src;
 
-    if (fetch_index_register(Mem) != Reg) {
-        @compileError("Source and Destination registers should be same register class");
-    }
+    ensure_matching_reg(Mem, Reg);
 
     const is_16bit = Reg == Register16;
     const is_64bit = Reg == Register64;
@@ -163,18 +152,18 @@ fn factory_mov(
                 };
             }
 
-            const modrm = modrm_byte(
-                0b11,
-                reg.reg_low3(),
-                rm.reg_low3(),
-            );
-
-            writen += writer.write(&.{
-                opcode,
-                modrm,
-            }) catch {
+            writen += 1;
+            writer.writeByte(opcode) catch {
                 return EncodingError.WriterError;
             };
+
+            writen += try emit_modrm_sib(
+                Reg,
+                Mem,
+                writer,
+                reg,
+                rm,
+            );
 
             return writen;
         }
@@ -229,18 +218,18 @@ fn factory_mov_imm(comptime Dst: type, comptime Src: type, comptime opcode: u8) 
             }
 
             if (dest_is_rm) {
-                const modrm = modrm_byte(
-                    0b11,
-                    0,
-                    dest.reg_low3(),
-                );
-
-                writen += writer.write(&.{
-                    opcode,
-                    modrm,
-                }) catch {
+                writen += 1;
+                writer.writeByte(opcode) catch {
                     return EncodingError.WriterError;
                 };
+
+                writen += try emit_modrm_sib(
+                    void,
+                    Dst,
+                    writer,
+                    undefined,
+                    dest,
+                );
             } else {
                 const movimm: u8 = movimm_byte(opcode, dest.reg_low3());
 
