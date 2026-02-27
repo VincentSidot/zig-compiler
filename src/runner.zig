@@ -49,7 +49,7 @@ pub fn load(path: []const u8) !FunctionLoader {
     const raw_buffer = system.mmap(
         null,
         file_size,
-        PROT.READ | PROT.WRITE | PROT.EXEC,
+        PROT.READ | PROT.WRITE,
         .{ .TYPE = .PRIVATE, .ANONYMOUS = true },
         -1,
         0,
@@ -76,7 +76,7 @@ pub fn load(path: []const u8) !FunctionLoader {
     const mprotect_result = system.mprotect(
         buffer_ptr,
         file_size,
-        PROT.EXEC | PROT.READ | PROT.WRITE,
+        PROT.EXEC | PROT.READ,
     );
 
     if (mprotect_result != 0) {
