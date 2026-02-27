@@ -24,11 +24,14 @@ test "MOV 16 bit registers extended" {
 test "MOV 16 bit registers reverse encoding" {
     try validate(RegisterIndex_16, RegisterMemory_16, "AX, CX", &.{ 0x66, 0x8B, 0xC1 }, mov.r16_rm16, .AX, .{ .reg = .CX });
     try validate(RegisterIndex_16, RegisterMemory_16, "R8W, AX", &.{ 0x66, 0x44, 0x8B, 0xC0 }, mov.r16_rm16, .R8W, .{ .reg = .AX });
+    try validate(RegisterIndex_16, RegisterMemory_16, "BX, R9W", &.{ 0x66, 0x41, 0x8B, 0xD9 }, mov.r16_rm16, .BX, .{ .reg = .R9W });
+    try validate(RegisterIndex_16, RegisterMemory_16, "DI, R13W", &.{ 0x66, 0x41, 0x8B, 0xFD }, mov.r16_rm16, .DI, .{ .reg = .R13W });
 }
 
 test "MOV 16 bit immediate to r/m16 encoding" {
     try validate(RegisterMemory_16, u16, "AX, 0x1234", &.{ 0x66, 0xC7, 0xC0, 0x34, 0x12 }, mov.rm16_imm16, .{ .reg = .AX }, 0x1234);
     try validate(RegisterMemory_16, u16, "R9W, 0x5678", &.{ 0x66, 0x41, 0xC7, 0xC1, 0x78, 0x56 }, mov.rm16_imm16, .{ .reg = .R9W }, 0x5678);
+    try validate(RegisterMemory_16, u16, "DI, 0xBEEF", &.{ 0x66, 0xC7, 0xC7, 0xEF, 0xBE }, mov.rm16_imm16, .{ .reg = .DI }, 0xBEEF);
 }
 
 test "MOV 16 bit immediate to register" {

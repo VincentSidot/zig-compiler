@@ -24,14 +24,18 @@ test "MOV 32 bit registers extended" {
 test "MOV 32 bit registers reverse encoding" {
     try validate(RegisterIndex_32, RegisterMemory_32, "EAX, ECX", &.{ 0x8B, 0xC1 }, mov.r32_rm32, .EAX, .{ .reg = .ECX });
     try validate(RegisterIndex_32, RegisterMemory_32, "R8D, EAX", &.{ 0x44, 0x8B, 0xC0 }, mov.r32_rm32, .R8D, .{ .reg = .EAX });
+    try validate(RegisterIndex_32, RegisterMemory_32, "EBX, R9D", &.{ 0x41, 0x8B, 0xD9 }, mov.r32_rm32, .EBX, .{ .reg = .R9D });
+    try validate(RegisterIndex_32, RegisterMemory_32, "EDI, R13D", &.{ 0x41, 0x8B, 0xFD }, mov.r32_rm32, .EDI, .{ .reg = .R13D });
 }
 
 test "MOV 32 bit immediate to r/m32 encoding" {
     try validate(RegisterMemory_32, u32, "EAX, 0x1234_5678", &.{ 0xC7, 0xC0, 0x78, 0x56, 0x34, 0x12 }, mov.rm32_imm32, .{ .reg = .EAX }, 0x1234_5678);
     try validate(RegisterMemory_32, u32, "R9D, 0x1234_5678", &.{ 0x41, 0xC7, 0xC1, 0x78, 0x56, 0x34, 0x12 }, mov.rm32_imm32, .{ .reg = .R9D }, 0x1234_5678);
+    try validate(RegisterMemory_32, u32, "EDI, 0x89AB_CDEF", &.{ 0xC7, 0xC7, 0xEF, 0xCD, 0xAB, 0x89 }, mov.rm32_imm32, .{ .reg = .EDI }, 0x89AB_CDEF);
 }
 
 test "MOV 32bit immediate to register" {
+    try validate(RegisterIndex_32, u32, "EAX, 0x12_34_56_78", &.{ 0xB8, 0x78, 0x56, 0x34, 0x12 }, mov.r32_imm32, .EAX, 0x12345678);
     try validate(RegisterIndex_32, u32, "R8D, 0x12_34_12_34", &.{ 0x41, 0xB8, 0x34, 0x12, 0x34, 0x12 }, mov.r32_imm32, .R8D, 0x12341234);
     try validate(RegisterIndex_32, u32, "R15D, 0xEF_EF_EF_EF", &.{ 0x41, 0xBF, 0xEF, 0xEF, 0xEF, 0xEF }, mov.r32_imm32, .R15D, 0xEFEFEFEF);
     try validate(RegisterIndex_32, u32, "R12D, 0x00_00_00_00", &.{ 0x41, 0xBC, 0x00, 0x00, 0x00, 0x00 }, mov.r32_imm32, .R12D, 0x00000000);

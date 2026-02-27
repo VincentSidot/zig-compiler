@@ -28,16 +28,21 @@ test "MOV 64 bit registers extended" {
 test "MOV 64 bit registers reverse encoding" {
     try validate(RegisterIndex_64, RegisterMemory_64, "RAX, RCX", &.{ 0x48, 0x8B, 0xC1 }, mov.r64_rm64, .RAX, .{ .reg = .RCX });
     try validate(RegisterIndex_64, RegisterMemory_64, "R8, RAX", &.{ 0x4C, 0x8B, 0xC0 }, mov.r64_rm64, .R8, .{ .reg = .RAX });
+    try validate(RegisterIndex_64, RegisterMemory_64, "RBX, R9", &.{ 0x49, 0x8B, 0xD9 }, mov.r64_rm64, .RBX, .{ .reg = .R9 });
+    try validate(RegisterIndex_64, RegisterMemory_64, "RDI, R13", &.{ 0x49, 0x8B, 0xFD }, mov.r64_rm64, .RDI, .{ .reg = .R13 });
 }
 
 test "MOV 64 bit immediate to r/m64 encoding" {
     try validate(RegisterMemory_64, u32, "RAX, 0x1234_5678", &.{ 0x48, 0xC7, 0xC0, 0x78, 0x56, 0x34, 0x12 }, mov.rm64_imm32, .{ .reg = .RAX }, 0x1234_5678);
     try validate(RegisterMemory_64, u32, "R9, 0x1234_5678", &.{ 0x49, 0xC7, 0xC1, 0x78, 0x56, 0x34, 0x12 }, mov.rm64_imm32, .{ .reg = .R9 }, 0x1234_5678);
+    try validate(RegisterMemory_64, u32, "RDI, 0x89AB_CDEF", &.{ 0x48, 0xC7, 0xC7, 0xEF, 0xCD, 0xAB, 0x89 }, mov.rm64_imm32, .{ .reg = .RDI }, 0x89AB_CDEF);
 }
 
 test "MOV 64 bit immediate64 direct encoding" {
     try validate(RegisterIndex_64, u64, "RAX, 0x1122_3344_5566_7788", &.{ 0x48, 0xB8, 0x88, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11 }, mov.r64_imm64, .RAX, 0x1122_3344_5566_7788);
     try validate(RegisterIndex_64, u64, "R9, 0x0102_0304_0506_0708", &.{ 0x49, 0xB9, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01 }, mov.r64_imm64, .R9, 0x0102_0304_0506_0708);
+    try validate(RegisterIndex_64, u64, "RBX, 0x0011_2233_4455_6677", &.{ 0x48, 0xBB, 0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00 }, mov.r64_imm64, .RBX, 0x0011_2233_4455_6677);
+    try validate(RegisterIndex_64, u64, "R15, 0x8899_AABB_CCDD_EEFF", &.{ 0x49, 0xBF, 0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x99, 0x88 }, mov.r64_imm64, .R15, 0x8899_AABB_CCDD_EEFF);
 }
 
 test "MOV 64 bit immediate to register" {
