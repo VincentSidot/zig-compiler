@@ -49,6 +49,36 @@ test "MOV 16 bit immediate to register extended" {
     try validate(RegisterIndex_16, u16, "R13W, 0xF0_F0", &.{ 0x66, 0x41, 0xBD, 0xF0, 0xF0 }, mov.r16_imm16, .R13W, 0xF0F0);
 }
 
+test "MOV 16 bit RIP-relative memory" {
+    try validate(
+        RegisterMemory_16,
+        RegisterIndex_16,
+        "[RIP + 0x1234], AX",
+        &.{ 0x66, 0x89, 0x05, 0x34, 0x12, 0x00, 0x00 },
+        mov.rm16_r16,
+        .{ .mem = .{ .ripRelative = 0x1234 } },
+        .AX,
+    );
+    try validate(
+        RegisterIndex_16,
+        RegisterMemory_16,
+        "R9W, [RIP - 8]",
+        &.{ 0x66, 0x44, 0x8B, 0x0D, 0xF8, 0xFF, 0xFF, 0xFF },
+        mov.r16_rm16,
+        .R9W,
+        .{ .mem = .{ .ripRelative = -8 } },
+    );
+    try validate(
+        RegisterMemory_16,
+        u16,
+        "[RIP + 0x10], 0xBEEF",
+        &.{ 0x66, 0xC7, 0x05, 0x10, 0x00, 0x00, 0x00, 0xEF, 0xBE },
+        mov.rm16_imm16,
+        .{ .mem = .{ .ripRelative = 0x10 } },
+        0xBEEF,
+    );
+}
+
 test "MOV 16 bit writer errors" {
     var buffer: [0]u8 = undefined;
     var writer = std.io.Writer.fixed(&buffer);

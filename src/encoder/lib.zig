@@ -1,5 +1,6 @@
 const mov_file = @import("mov.zig");
 const reg_file = @import("reg.zig");
+const arithmetic_file = @import("arithmetic.zig");
 const error_file = @import("error.zig");
 
 pub const mov = mov_file.mov;
@@ -14,6 +15,8 @@ pub const RegisterMemory_64 = reg_file.RegisterMemory_64;
 pub const RegisterMemory_32 = reg_file.RegisterMemory_32;
 pub const RegisterMemory_16 = reg_file.RegisterMemory_16;
 pub const RegisterMemory_8 = reg_file.RegisterMemory_8;
+
+pub const extractBits = arithmetic_file.extractBits;
 
 test {
     const std = @import("std");

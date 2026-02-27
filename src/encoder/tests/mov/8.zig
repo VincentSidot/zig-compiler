@@ -380,6 +380,36 @@ test "MOV 8 bit immediate low and high-byte edge cases" {
     );
 }
 
+test "MOV 8 bit RIP-relative memory" {
+    try validate(
+        RegisterMemory_8,
+        RegisterIndex_8,
+        "[RIP + 0x12345678], AL",
+        &.{ 0x88, 0x05, 0x78, 0x56, 0x34, 0x12 },
+        mov.rm8_r8,
+        .{ .mem = .{ .ripRelative = 0x1234_5678 } },
+        .AL,
+    );
+    try validate(
+        RegisterIndex_8,
+        RegisterMemory_8,
+        "CL, [RIP - 4]",
+        &.{ 0x8A, 0x0D, 0xFC, 0xFF, 0xFF, 0xFF },
+        mov.r8_rm8,
+        .CL,
+        .{ .mem = .{ .ripRelative = -4 } },
+    );
+    try validate(
+        RegisterMemory_8,
+        u8,
+        "[RIP + 0x20], 0x7F",
+        &.{ 0xC6, 0x05, 0x20, 0x00, 0x00, 0x00, 0x7F },
+        mov.rm8_imm8,
+        .{ .mem = .{ .ripRelative = 0x20 } },
+        0x7F,
+    );
+}
+
 test "MOV 8 bit writer errors" {
     var buffer: [0]u8 = undefined;
     var writer = std.io.Writer.fixed(&buffer);

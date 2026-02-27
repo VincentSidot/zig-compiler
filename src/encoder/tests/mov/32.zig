@@ -43,6 +43,36 @@ test "MOV 32bit immediate to register" {
     try validate(RegisterIndex_32, u32, "R9D, 0x00_00_00_FF", &.{ 0x41, 0xB9, 0xFF, 0x00, 0x00, 0x00 }, mov.r32_imm32, .R9D, 0x000000FF);
 }
 
+test "MOV 32 bit RIP-relative memory" {
+    try validate(
+        RegisterMemory_32,
+        RegisterIndex_32,
+        "[RIP + 0x1234], ECX",
+        &.{ 0x89, 0x0D, 0x34, 0x12, 0x00, 0x00 },
+        mov.rm32_r32,
+        .{ .mem = .{ .ripRelative = 0x1234 } },
+        .ECX,
+    );
+    try validate(
+        RegisterIndex_32,
+        RegisterMemory_32,
+        "R9D, [RIP - 16]",
+        &.{ 0x44, 0x8B, 0x0D, 0xF0, 0xFF, 0xFF, 0xFF },
+        mov.r32_rm32,
+        .R9D,
+        .{ .mem = .{ .ripRelative = -16 } },
+    );
+    try validate(
+        RegisterMemory_32,
+        u32,
+        "[RIP + 0x1234], 0x89AB_CDEF",
+        &.{ 0xC7, 0x05, 0x34, 0x12, 0x00, 0x00, 0xEF, 0xCD, 0xAB, 0x89 },
+        mov.rm32_imm32,
+        .{ .mem = .{ .ripRelative = 0x1234 } },
+        0x89AB_CDEF,
+    );
+}
+
 test "MOV 32 bit writer errors" {
     var buffer: [0]u8 = undefined;
     var writer = std.io.Writer.fixed(&buffer);

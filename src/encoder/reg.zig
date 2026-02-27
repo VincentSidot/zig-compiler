@@ -4,6 +4,9 @@ const Writer = std.io.Writer;
 const error_file = @import("error.zig");
 const EncodingError = error_file.EncodingError;
 
+const arithmetic_file = @import("arithmetic.zig");
+const extractBits = arithmetic_file.extractBits;
+
 fn factory_reg_low3(comptime T: type) fn (value: T) callconv(.@"inline") u3 {
     return struct {
         inline fn inner(value: T) u3 {
@@ -215,14 +218,7 @@ pub const BaseIndexMemory = struct {
     }
 };
 
-pub const RipRelativeMemory = struct {
-    disp: i32 = 0, // Displacement for RIP-relative addressing
-
-    pub inline fn validate(self: RipRelativeMemory) EncodingError!void {
-        _ = self;
-        // No specific validation needed for RIP-relative addressing.
-    }
-};
+pub const RipRelativeMemory = i32;
 
 pub const Memory = union(enum) {
     baseIndex: BaseIndexMemory,
@@ -231,7 +227,30 @@ pub const Memory = union(enum) {
     pub inline fn validate(self: Memory) EncodingError!void {
         return switch (self) {
             .baseIndex => |mem| mem.validate(),
-            .ripRelative => |mem| mem.validate(),
+            // No validation needed for RIP-relative memory
+            .ripRelative => |_| {},
+        };
+    }
+
+    pub inline fn need_rex(self: Memory) bool {
+        return switch (self) {
+            .baseIndex => |mem| {
+                // Not implemented yet
+                _ = mem;
+                @panic("Base/index memory operand REX prefix check not implemented");
+            },
+            .ripRelative => |_| false, // RIP-relative addressing does not require REX prefix
+        };
+    }
+
+    pub inline fn is_extended(self: Memory) bool {
+        return switch (self) {
+            .baseIndex => |mem| {
+                // Not implemented yet
+                _ = mem;
+                @panic("Base/index memory operand extended register check not implemented");
+            },
+            .ripRelative => |_| false, // RIP-relative addressing does not involve registers
         };
     }
 };
@@ -245,17 +264,14 @@ fn RegMem(comptime R: type) type {
         pub inline fn validate(self: Self) EncodingError!void {
             return switch (self) {
                 .reg => |_| {},
-                .mem => |mem| mem.validate(),
+                .mem => |m| m.validate(),
             };
         }
 
         pub inline fn need_rex(self: Self) bool {
             return switch (self) {
                 .reg => |r| r.need_rex(),
-                .mem => |_| {
-                    // Not implemented yet
-                    @panic("Memory operand REX prefix check not implemented");
-                },
+                .mem => |m| m.need_rex(),
             };
         }
 
@@ -269,10 +285,7 @@ fn RegMem(comptime R: type) type {
         pub inline fn is_extended(self: Self) bool {
             return switch (self) {
                 .reg => |r| r.is_extended(),
-                .mem => |_| {
-                    // Not implemented yet
-                    @panic("Memory operand extended register check not implemented");
-                },
+                .mem => |m| m.is_extended(),
             };
         }
     };
@@ -283,14 +296,209 @@ pub const RegisterMemory_32 = RegMem(RegisterIndex_32);
 pub const RegisterMemory_16 = RegMem(RegisterIndex_16);
 pub const RegisterMemory_8 = RegMem(RegisterIndex_8);
 
+/// ModRM byte encoding:
+/// mod: addressing mode (2 bits)
+/// reg: register operand (3 bits)
+/// rm: r/m operand (3 bits)
+fn modrm(mod: u8, reg3: u8, rm3: u8) u8 {
+    // mod (2 bits) in bits 7..6
+    // reg (3 bits) in bits 5..3
+    // rm  (3 bits) in bits 2..0
+    return ((mod & 0x3) << 6) | ((reg3 & 0x7) << 3) | (rm3 & 0x7);
+}
+
+pub fn emit_modrm_sib(
+    /// Reg operand type (e.g., RegisterIndex_64, RegisterIndex_32, etc.)
+    /// Note: You can also use void if you want to force a 0 in the reg field
+    /// of the ModR/M byte, which is useful for certain instructions that don't
+    /// use the reg field.
+    comptime Reg: type,
+    comptime Mem: type,
+    writer: *Writer,
+    /// In case of Reg being void, pass undefined here to satisfy the type
+    /// system, but it will be ignored.
+    reg: Reg,
+    rm: Mem,
+) EncodingError!usize {
+    var written: usize = undefined;
+
+    try rm.validate();
+
+    switch (rm) {
+        .reg => |rm_reg| {
+            written = try emit_modrm_sib_reg_only(
+                Reg,
+                @TypeOf(rm_reg),
+                writer,
+                reg,
+                rm_reg,
+            );
+        },
+        .mem => |rm_mem| {
+            switch (rm_mem) {
+                .baseIndex => |rm_mem_base_index| {
+                    _ = rm_mem_base_index;
+                    @panic("Base/index memory operand encoding not implemented yet");
+                },
+                .ripRelative => |rm_mem_rip| {
+                    written = try emit_modrm_sib_rip_relative(
+                        Reg,
+                        writer,
+                        reg,
+                        rm_mem_rip,
+                    );
+                },
+            }
+        },
+    }
+
+    return written;
+}
+
+fn emit_modrm_sib_reg_only(
+    comptime Reg: type,
+    comptime Mem: type,
+    writer: *Writer,
+    reg: Reg,
+    rm_reg: Mem,
+) EncodingError!usize {
+    ensure_index_reg(Mem);
+    if (Reg != void) {
+        ensure_index_reg(Reg);
+        ensure_matching_reg(Mem, Reg);
+    }
+
+    // Compute components
+    const mod = 0b11; // Register addressing mode
+    const reg3: u3 = compute_reg3(Reg, reg);
+    const rm3 = rm_reg.reg_low3();
+
+    // Encode ModR/M byte
+    const modrm_byte = modrm(mod, reg3, rm3);
+
+    writer.writeByte(modrm_byte) catch {
+        return EncodingError.WriterError;
+    };
+    return 1; // Number of bytes written
+}
+
+fn emit_modrm_sib_rip_relative(
+    comptime Reg: type,
+    writer: *Writer,
+    reg: Reg,
+    disp: RipRelativeMemory,
+) EncodingError!usize {
+    if (Reg != void) {
+        ensure_index_reg(Reg);
+    }
+
+    var written: usize = 0;
+
+    // Compute components
+    const mod = 0b00; // Register addressing mode
+    const reg3: u3 = compute_reg3(Reg, reg);
+    const rm3 = 0b101; // RIP-relative addressing mode
+    const modrm_byte = modrm(mod, reg3, rm3);
+
+    // Compute disp32
+    const disp32: [@sizeOf(RipRelativeMemory)]u8 = extractBits(RipRelativeMemory, disp);
+
+    // Write ModR/M and disp32
+    written += 1;
+    writer.writeByte(modrm_byte) catch {
+        return EncodingError.WriterError;
+    };
+    written += @sizeOf(RipRelativeMemory);
+    writer.writeAll(&disp32) catch {
+        return EncodingError.WriterError;
+    };
+
+    return written;
+}
+
+inline fn compute_reg3(comptime Reg: type, reg: Reg) u3 {
+    var reg3: u3 = undefined;
+
+    if (Reg != void) {
+        ensure_index_reg(Reg);
+        reg3 = reg.reg_low3();
+    } else {
+        reg3 = 0; // Default to 0 if Reg is void
+    }
+
+    return reg3;
+}
+
 pub fn is_memory_register(comptime T: type) bool {
-    const name = @typeName(T);
-    return std.mem.indexOf(u8, name, "RegMem(") != null;
+    comptime {
+        const typeInfo = @typeInfo(T);
+
+        switch (typeInfo) {
+            .@"union" => |unionInfo| {
+                var foundField: u2 = 0;
+
+                for (unionInfo.fields) |field| {
+                    if (std.mem.eql(u8, field.name, "reg")) {
+                        if (is_index_register(field.type)) {
+                            foundField |= 0b01;
+                        } else {
+                            return false; // The 'reg' field exists but is not a valid index register type
+                        }
+                    } else if (std.mem.eql(u8, field.name, "mem")) {
+                        if (is_memory(field.type)) {
+                            foundField |= 0b10;
+                        } else {
+                            return false; // The 'mem' field exists but is not of type Memory
+                        }
+                    }
+                }
+
+                if (foundField == 0b11) {
+                    return true;
+                } else {
+                    return false;
+                }
+            },
+            else => {
+                return false;
+            },
+        }
+    }
 }
 
 pub fn is_index_register(comptime T: type) bool {
-    const name = @typeName(T);
-    return std.mem.indexOf(u8, name, "RegisterIndex_") != null;
+    comptime {
+        const typeInfo = @typeInfo(T);
+
+        switch (typeInfo) {
+            .@"enum" => |enumInfo| {
+                var foundMethod: u4 = 0;
+
+                for (enumInfo.decls) |field| {
+                    if (std.mem.eql(u8, field.name, "reg_low3")) {
+                        foundMethod |= 0b0001;
+                    } else if (std.mem.eql(u8, field.name, "is_extended")) {
+                        foundMethod |= 0b0010;
+                    } else if (std.mem.eql(u8, field.name, "need_rex")) {
+                        foundMethod |= 0b0100;
+                    } else if (std.mem.eql(u8, field.name, "is_high_register")) {
+                        foundMethod |= 0b1000;
+                    }
+                }
+                // Check if all required flags are set
+                return foundMethod == 0b1111;
+            },
+            else => {
+                return false;
+            },
+        }
+    }
+}
+
+pub fn is_memory(comptime T: type) bool {
+    comptime {
+        return T == Memory;
+    }
 }
 
 pub fn fetch_index_register(comptime Mem: type) type {
@@ -332,7 +540,12 @@ pub fn ensure_index_reg(comptime Reg: type) void {
 
 pub fn ensure_matching_reg(comptime Mem: type, comptime Reg: type) void {
     comptime {
-        if (fetch_index_register(Mem) != Reg) {
+        var memType = Mem;
+        if (is_memory_register(Mem)) {
+            memType = fetch_index_register(Mem);
+        }
+
+        if (memType != Reg) {
             const memTypeName = @typeName(Mem);
             const regTypeName = @typeName(Reg);
             const errorMessage = std.fmt.comptimePrint(
@@ -342,64 +555,5 @@ pub fn ensure_matching_reg(comptime Mem: type, comptime Reg: type) void {
 
             @compileError(errorMessage);
         }
-    }
-}
-
-/// ModRM byte encoding:
-/// mod: addressing mode (2 bits)
-/// reg: register operand (3 bits)
-/// rm: r/m operand (3 bits)
-fn modrm(mod: u8, reg3: u8, rm3: u8) u8 {
-    // mod (2 bits) in bits 7..6
-    // reg (3 bits) in bits 5..3
-    // rm  (3 bits) in bits 2..0
-    return ((mod & 0x3) << 6) | ((reg3 & 0x7) << 3) | (rm3 & 0x7);
-}
-
-pub fn emit_modrm_sib(
-    /// Reg operand type (e.g., RegisterIndex_64, RegisterIndex_32, etc.)
-    /// Note: You can also use void if you want to force a 0 in the reg field
-    /// of the ModR/M byte, which is useful for certain instructions that don't
-    /// use the reg field.
-    comptime Reg: type,
-    comptime Mem: type,
-    writer: *Writer,
-    /// In case of Reg being void, pass undefined here to satisfy the type
-    /// system, but it will be ignored.
-    reg: Reg,
-    rm: Mem,
-) EncodingError!usize {
-    // Comptime type validation to ensure correct usage of the function.
-    ensure_mem_reg(Mem);
-    if (Reg != void) {
-        ensure_index_reg(Reg);
-        ensure_matching_reg(Mem, Reg);
-    }
-
-    switch (rm) {
-        .reg => |rm_reg| {
-            const mod = 0b11; // Register addressing mode
-            var reg3: u3 = undefined;
-
-            if (Reg != void) {
-                reg3 = reg.reg_low3();
-            } else {
-                // If Reg is void, we set reg3 to 0, which is often used for
-                // instructions that don't utilize the reg field.
-                reg3 = 0;
-            }
-
-            const rm3 = rm_reg.reg_low3();
-            const modrm_byte = modrm(mod, reg3, rm3);
-
-            writer.writeByte(modrm_byte) catch {
-                return EncodingError.WriterError;
-            };
-            return 1; // Number of bytes written
-        },
-        .mem => |rm_mem| {
-            _ = rm_mem; // Not implemented yet, but this is where we would handle memory operand encoding.
-            @panic("Memory operand encoding not implemented yet");
-        },
     }
 }

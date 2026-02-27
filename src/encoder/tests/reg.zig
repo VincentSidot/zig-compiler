@@ -33,9 +33,7 @@ test "RegMem validate accepts base/index memory operand" {
 test "RegMem validate accepts RIP-relative memory operand" {
     const op: RegisterMemory_64 = .{
         .mem = .{
-            .ripRelative = .{
-                .disp = 32,
-            },
+            .ripRelative = 32,
         },
     };
 

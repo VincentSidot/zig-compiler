@@ -66,6 +66,36 @@ test "MOV 64 bit immediate auto boundary values" {
     try validate(RegisterIndex_64, u64, "RAX, 0xFFFF_FFFF_8000_0000", &.{ 0x48, 0xC7, 0xC0, 0x00, 0x00, 0x00, 0x80 }, mov.r64_imm64_auto, .RAX, 0xFFFF_FFFF_8000_0000);
 }
 
+test "MOV 64 bit RIP-relative memory" {
+    try validate(
+        RegisterMemory_64,
+        RegisterIndex_64,
+        "[RIP + 0x1234], RAX",
+        &.{ 0x48, 0x89, 0x05, 0x34, 0x12, 0x00, 0x00 },
+        mov.rm64_r64,
+        .{ .mem = .{ .ripRelative = 0x1234 } },
+        .RAX,
+    );
+    try validate(
+        RegisterIndex_64,
+        RegisterMemory_64,
+        "R9, [RIP - 24]",
+        &.{ 0x4C, 0x8B, 0x0D, 0xE8, 0xFF, 0xFF, 0xFF },
+        mov.r64_rm64,
+        .R9,
+        .{ .mem = .{ .ripRelative = -24 } },
+    );
+    try validate(
+        RegisterMemory_64,
+        u32,
+        "[RIP + 0x1234], 0x89AB_CDEF",
+        &.{ 0x48, 0xC7, 0x05, 0x34, 0x12, 0x00, 0x00, 0xEF, 0xCD, 0xAB, 0x89 },
+        mov.rm64_imm32,
+        .{ .mem = .{ .ripRelative = 0x1234 } },
+        0x89AB_CDEF,
+    );
+}
+
 test "MOV 64 bit writer errors" {
     var buffer: [0]u8 = undefined;
     var writer = std.io.Writer.fixed(&buffer);

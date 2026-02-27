@@ -21,6 +21,9 @@ else
 const error_file = @import("error.zig");
 const EncodingError = error_file.EncodingError;
 
+const arithmetic = @import("arithmetic.zig");
+const extractBits = arithmetic.extractBits;
+
 const register = @import("reg.zig");
 
 const Register64 = register.RegisterIndex_64;
@@ -172,27 +175,27 @@ fn factory_mov(
     return factory._inner;
 }
 
-fn factory_mov_imm(comptime Dst: type, comptime Src: type, comptime opcode: u8) fn (writer: *Writer, dest: Dst, source: Src) EncodingError!usize {
-    const dest_is_rm = comptime is_memory_register(Dst);
+fn factory_mov_imm(comptime Reg: type, comptime Imm: type, comptime opcode: u8) fn (writer: *Writer, dest: Reg, source: Imm) EncodingError!usize {
+    const dest_is_rm = comptime is_memory_register(Reg);
 
     const is_16bit = comptime blk: {
-        if (is_memory_register(Dst)) {
-            break :blk fetch_index_register(Dst) == Register16;
+        if (is_memory_register(Reg)) {
+            break :blk fetch_index_register(Reg) == Register16;
         } else {
-            break :blk Dst == Register16;
+            break :blk Reg == Register16;
         }
     };
 
     const is_64bit = comptime blk: {
-        if (is_memory_register(Dst)) {
-            break :blk fetch_index_register(Dst) == Register64;
+        if (is_memory_register(Reg)) {
+            break :blk fetch_index_register(Reg) == Register64;
         } else {
-            break :blk Dst == Register64;
+            break :blk Reg == Register64;
         }
     };
 
     const factory = struct {
-        fn _inner(writer: *Writer, dest: Dst, source: Src) EncodingError!usize {
+        fn _inner(writer: *Writer, dest: Reg, source: Imm) EncodingError!usize {
             var writen: usize = 0;
 
             if (is_16bit) {
@@ -203,7 +206,7 @@ fn factory_mov_imm(comptime Dst: type, comptime Src: type, comptime opcode: u8) 
                 };
             }
 
-            if (dest.need_rex()) {
+            if (dest.need_rex() or Reg == RegisterMemory64) {
                 const rex = rex_bytes(
                     is_64bit, // w bit is set for 64-bit operand size
                     false,
@@ -225,7 +228,7 @@ fn factory_mov_imm(comptime Dst: type, comptime Src: type, comptime opcode: u8) 
 
                 writen += try emit_modrm_sib(
                     void,
-                    Dst,
+                    Reg,
                     writer,
                     undefined,
                     dest,
@@ -240,8 +243,10 @@ fn factory_mov_imm(comptime Dst: type, comptime Src: type, comptime opcode: u8) 
             }
 
             // Write the immediate value in little-endian format
-            writen += @sizeOf(Src);
-            writer.writeInt(Src, source, .little) catch {
+            // Here Src is the type of the immediate value.
+            writen += @sizeOf(Imm);
+            const bytes = extractBits(Imm, source);
+            writer.writeAll(&bytes) catch {
                 return EncodingError.WriterError;
             };
 

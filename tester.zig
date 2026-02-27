@@ -142,7 +142,18 @@ pub fn main() !void {
 
 // Here we define the instruction that we want to encode and test.
 fn inst_to_encode(writer: *std.io.Writer) EncodingError!void {
-    _ = try mov.rm32_r32(writer, .EAX, .EBP);
-    _ = try mov.rm8_imm8(writer, .R8B, 0x42);
-    _ = try mov.rm64_r64(writer, .R10, .RBP);
+    // BUG: rm64_imm32 with RIP-relative memory is missing REX.W and decodes as DWORD PTR.
+    _ = try mov.rm64_imm32(writer, .{ .mem = .{ .ripRelative = 0x10 } }, 0x1122_3344);
+    _ = try mov.rm32_imm32(writer, .{ .mem = .{ .ripRelative = 0x10 } }, 0x1122_3344);
+
+    _ = try mov.rm64_imm32(writer, .{ .mem = .{ .ripRelative = 0x1234 } }, 0x89AB_CDEF);
+
+    // Works: rm64_imm32 with register destination emits REX.W and is 64-bit.
+    _ = try mov.rm64_imm32(writer, .{ .reg = .RAX }, 0x1122_3344);
+
+    // Works: mov r64, imm64 form (B8+rd) explicitly emits a 64-bit immediate move.
+    _ = try mov.r64_imm64(writer, .RAX, 0x0000_0000_1122_3344);
+
+    // Works: auto form picks sign-extended imm32-to-r64 (still with REX.W for register destination).
+    _ = try mov.r64_imm64_auto(writer, .RAX, 0x0000_0000_1122_3344);
 }
