@@ -425,6 +425,200 @@ test "MOV 8 bit RIP-relative memory" {
     );
 }
 
+test "MOV 8 bit base-index64 memory" {
+    try validate(
+        RegisterMemory_8,
+        RegisterIndex_8,
+        "[R8], AL",
+        &.{ 0x41, 0x88, 0x00 },
+        mov.rm8_r8,
+        .{ .mem = .{ .baseIndex64 = .{ .base = .R8 } } },
+        .AL,
+    );
+    try validate(
+        RegisterMemory_8,
+        RegisterIndex_8,
+        "[R9 + 4], AL",
+        &.{ 0x41, 0x88, 0x41, 0x04 },
+        mov.rm8_r8,
+        .{ .mem = .{ .baseIndex64 = .{ .base = .R9, .disp = 4 } } },
+        .AL,
+    );
+    try validate(
+        RegisterMemory_8,
+        u8,
+        "[RAX + R10*2 - 4], 0x42",
+        &.{ 0x42, 0xC6, 0x44, 0x50, 0xFC, 0x42 },
+        mov.rm8_imm8,
+        .{
+            .mem = .{
+                .baseIndex64 = .{
+                    .base = .RAX,
+                    .index = .{
+                        .reg = .R10,
+                        .scale = .x2,
+                    },
+                    .disp = -4,
+                },
+            },
+        },
+        0x42,
+    );
+    try validate(
+        RegisterIndex_8,
+        RegisterMemory_8,
+        "R11B, [R8]",
+        &.{ 0x45, 0x8A, 0x18 },
+        mov.r8_rm8,
+        .R11B,
+        .{ .mem = .{ .baseIndex64 = .{ .base = .R8 } } },
+    );
+    try validate(
+        RegisterIndex_8,
+        RegisterMemory_8,
+        "R11B, [R9 + 4]",
+        &.{ 0x45, 0x8A, 0x59, 0x04 },
+        mov.r8_rm8,
+        .R11B,
+        .{ .mem = .{ .baseIndex64 = .{ .base = .R9, .disp = 4 } } },
+    );
+    try validate(
+        RegisterMemory_8,
+        RegisterIndex_8,
+        "[RAX + R10*8 + 0x10], R11B",
+        &.{ 0x46, 0x88, 0x5C, 0xD0, 0x10 },
+        mov.rm8_r8,
+        .{
+            .mem = .{
+                .baseIndex64 = .{
+                    .base = .RAX,
+                    .index = .{
+                        .reg = .R10,
+                        .scale = .x8,
+                    },
+                    .disp = 0x10,
+                },
+            },
+        },
+        .R11B,
+    );
+}
+
+test "MOV 8 bit base-index32 memory" {
+    try validate(
+        RegisterMemory_8,
+        RegisterIndex_8,
+        "[EBX + ECX*2], AL",
+        &.{ 0x67, 0x88, 0x04, 0x4B },
+        mov.rm8_r8,
+        .{
+            .mem = .{
+                .baseIndex32 = .{
+                    .base = .EBX,
+                    .index = .{
+                        .reg = .ECX,
+                        .scale = .x2,
+                    },
+                },
+            },
+        },
+        .AL,
+    );
+    try validate(
+        RegisterIndex_8,
+        RegisterMemory_8,
+        "R11B, [EBX + ECX*2]",
+        &.{ 0x67, 0x44, 0x8A, 0x1C, 0x4B },
+        mov.r8_rm8,
+        .R11B,
+        .{
+            .mem = .{
+                .baseIndex32 = .{
+                    .base = .EBX,
+                    .index = .{
+                        .reg = .ECX,
+                        .scale = .x2,
+                    },
+                },
+            },
+        },
+    );
+    try validate(
+        RegisterMemory_8,
+        RegisterIndex_8,
+        "[R8D], AL",
+        &.{ 0x67, 0x41, 0x88, 0x00 },
+        mov.rm8_r8,
+        .{ .mem = .{ .baseIndex32 = .{ .base = .R8D } } },
+        .AL,
+    );
+    try validate(
+        RegisterIndex_8,
+        RegisterMemory_8,
+        "R11B, [R8D]",
+        &.{ 0x67, 0x45, 0x8A, 0x18 },
+        mov.r8_rm8,
+        .R11B,
+        .{ .mem = .{ .baseIndex32 = .{ .base = .R8D } } },
+    );
+    try validate(
+        RegisterMemory_8,
+        u8,
+        "[EBP], 0x44",
+        &.{ 0x67, 0xC6, 0x45, 0x00, 0x44 },
+        mov.rm8_imm8,
+        .{ .mem = .{ .baseIndex32 = .{ .base = .EBP } } },
+        0x44,
+    );
+    try validate(
+        RegisterMemory_8,
+        RegisterIndex_8,
+        "[ECX*4 + 0x1234], AL",
+        &.{ 0x67, 0x88, 0x04, 0x8D, 0x34, 0x12, 0x00, 0x00 },
+        mov.rm8_r8,
+        .{
+            .mem = .{
+                .baseIndex32 = .{
+                    .base = null,
+                    .index = .{
+                        .reg = .ECX,
+                        .scale = .x4,
+                    },
+                    .disp = 0x1234,
+                },
+            },
+        },
+        .AL,
+    );
+    try validate(
+        RegisterMemory_8,
+        RegisterIndex_8,
+        "[addr32:0x1234], AL",
+        &.{ 0x67, 0x88, 0x05, 0x34, 0x12, 0x00, 0x00 },
+        mov.rm8_r8,
+        .{ .mem = .{ .baseIndex32 = .{ .base = null, .index = null, .disp = 0x1234 } } },
+        .AL,
+    );
+    try validate(
+        RegisterIndex_8,
+        RegisterMemory_8,
+        "R11B, [addr32:0x1234]",
+        &.{ 0x67, 0x44, 0x8A, 0x1D, 0x34, 0x12, 0x00, 0x00 },
+        mov.r8_rm8,
+        .R11B,
+        .{ .mem = .{ .baseIndex32 = .{ .base = null, .index = null, .disp = 0x1234 } } },
+    );
+    try validate(
+        RegisterMemory_8,
+        u8,
+        "[addr32:0x1234], 0x44",
+        &.{ 0x67, 0xC6, 0x05, 0x34, 0x12, 0x00, 0x00, 0x44 },
+        mov.rm8_imm8,
+        .{ .mem = .{ .baseIndex32 = .{ .base = null, .index = null, .disp = 0x1234 } } },
+        0x44,
+    );
+}
+
 test "MOV 8 bit writer errors" {
     var buffer: [0]u8 = undefined;
     var writer = std.io.Writer.fixed(&buffer);
