@@ -41,6 +41,8 @@ const fetch_index_register = register.fetch_index_register;
 const emit_modrm_sib = register.emit_modrm_sib;
 const ensure_matching_reg = register.ensure_matching_reg;
 
+const BIT32_ADDRESSING_PREFIX = register.BIT32_ADDRESSING_PREFIX;
+
 const Register16_LegacyPrefix = 0x66;
 
 /// REX prefix encoding for x86-64 instructions.
@@ -137,10 +139,20 @@ fn factory_mov(
                 rm = source;
             }
 
+            const is_32bit_mem = rm.is_memory32();
+
             if (is_16bit) {
                 // For 16-bit registers, we need to add legacy prefix
                 writen += 1;
                 writer.writeByte(Register16_LegacyPrefix) catch {
+                    return EncodingError.WriterError;
+                };
+            }
+
+            if (is_32bit_mem) {
+                // For 32-bit memory operands, we need to add legacy prefix in 64-bit mode
+                writen += 1;
+                writer.writeByte(BIT32_ADDRESSING_PREFIX) catch {
                     return EncodingError.WriterError;
                 };
             }
@@ -201,11 +213,19 @@ fn factory_mov_imm(comptime Reg: type, comptime Imm: type, comptime opcode: u8) 
     const factory = struct {
         fn _inner(writer: *Writer, dest: Reg, source: Imm) EncodingError!usize {
             var writen: usize = 0;
+            const is_32bit_mem = if (dest_is_rm) dest.is_memory32() else false;
 
             if (is_16bit) {
                 // For 16-bit registers, we need to add legacy prefix
                 writen += 1;
                 writer.writeByte(Register16_LegacyPrefix) catch {
+                    return EncodingError.WriterError;
+                };
+            }
+
+            if (is_32bit_mem) {
+                writen += 1;
+                writer.writeByte(BIT32_ADDRESSING_PREFIX) catch {
                     return EncodingError.WriterError;
                 };
             }

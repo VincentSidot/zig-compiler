@@ -287,6 +287,94 @@ test "MOV 64 bit base-index memory edge cases" {
     );
 }
 
+test "MOV 64 bit base-index32 memory" {
+    try validate(
+        RegisterMemory_64,
+        RegisterIndex_64,
+        "[EBX + ECX*2], RAX",
+        &.{ 0x67, 0x48, 0x89, 0x04, 0x4B },
+        mov.rm64_r64,
+        .{
+            .mem = .{
+                .baseIndex32 = .{
+                    .base = .EBX,
+                    .index = .{
+                        .reg = .ECX,
+                        .scale = .x2,
+                    },
+                },
+            },
+        },
+        .RAX,
+    );
+    try validate(
+        RegisterIndex_64,
+        RegisterMemory_64,
+        "RAX, [EBX + ECX*2]",
+        &.{ 0x67, 0x48, 0x8B, 0x04, 0x4B },
+        mov.r64_rm64,
+        .RAX,
+        .{
+            .mem = .{
+                .baseIndex32 = .{
+                    .base = .EBX,
+                    .index = .{
+                        .reg = .ECX,
+                        .scale = .x2,
+                    },
+                },
+            },
+        },
+    );
+    try validate(
+        RegisterMemory_64,
+        RegisterIndex_64,
+        "[R8D], RAX",
+        &.{ 0x67, 0x49, 0x89, 0x00 },
+        mov.rm64_r64,
+        .{ .mem = .{ .baseIndex32 = .{ .base = .R8D } } },
+        .RAX,
+    );
+    try validate(
+        RegisterIndex_64,
+        RegisterMemory_64,
+        "RAX, [R8D]",
+        &.{ 0x67, 0x49, 0x8B, 0x00 },
+        mov.r64_rm64,
+        .RAX,
+        .{ .mem = .{ .baseIndex32 = .{ .base = .R8D } } },
+    );
+    try validate(
+        RegisterMemory_64,
+        u32,
+        "[EBP], 0x11223344",
+        &.{ 0x67, 0x48, 0xC7, 0x45, 0x00, 0x44, 0x33, 0x22, 0x11 },
+        mov.rm64_imm32,
+        .{ .mem = .{ .baseIndex32 = .{ .base = .EBP } } },
+        0x11223344,
+    );
+    try validate(
+        RegisterMemory_64,
+        RegisterIndex_64,
+        "[ECX*4 + 0x1234], RAX",
+        &.{ 0x67, 0x48, 0x89, 0x04, 0x8D, 0x34, 0x12, 0x00, 0x00 },
+        mov.rm64_r64,
+        .{
+            .mem = .{
+                .baseIndex32 = .{
+                    .base = null,
+                    .index = .{
+                        .reg = .ECX,
+                        .scale = .x4,
+                    },
+                    .disp = 0x1234,
+                },
+            },
+        },
+        .RAX,
+    );
+}
+
 test "MOV 64 bit writer errors" {
     var buffer: [0]u8 = undefined;
     var writer = std.io.Writer.fixed(&buffer);

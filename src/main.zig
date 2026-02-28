@@ -21,14 +21,6 @@ pub const std_options: std.Options = .{
 };
 
 pub fn main() !void {
-    const T = void;
-
-    const toto: T = undefined;
-
-    printf("Test: {any}", .{toto});
-}
-
-pub fn main2() !void {
     printf("Hello, World!\n", .{});
 
     // Prints to stderr, ignoring potential errors.

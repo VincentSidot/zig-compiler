@@ -25,6 +25,9 @@ fn factory_is_extended(comptime T: type) fn (value: T) callconv(.@"inline") bool
     }.inner;
 }
 
+// Operand-size override prefix for 32-bit addressing in 64-bit mode
+pub const BIT32_ADDRESSING_PREFIX: u8 = 0x67;
+
 pub const RegisterIndex_64 = enum(u8) {
     const Self = @This();
 
@@ -430,6 +433,20 @@ pub const Memory = union(enum) {
             }, // RIP-relative addressing does not involve registers
         }
     }
+
+    pub inline fn is_memory32(self: Memory) bool {
+        switch (self) {
+            .baseIndex32 => |_| {
+                return true;
+            },
+            .baseIndex64 => |_| {
+                return false;
+            },
+            .ripRelative => |_| {
+                return false;
+            },
+        }
+    }
 };
 
 fn RegMem(comptime R: type) type {
@@ -443,6 +460,17 @@ fn RegMem(comptime R: type) type {
                 .reg => |_| {},
                 .mem => |m| m.validate(),
             };
+        }
+
+        pub inline fn is_memory32(self: Self) bool {
+            switch (self) {
+                .reg => |_| {
+                    return false;
+                },
+                .mem => |m| {
+                    return m.is_memory32();
+                },
+            }
         }
 
         pub inline fn need_rex(self: Self) bool {

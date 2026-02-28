@@ -8,7 +8,7 @@ const encoder = @import("src/encoder/lib.zig");
 const EncodingError = encoder.EncodingError;
 const mov = encoder.mov;
 
-const default_bin_path: []const u8 = "./temp/out.bin";
+const default_bin_path: []const u8 = "../temp/out.bin";
 
 const Tester = struct {
     path: []const u8,
@@ -142,23 +142,33 @@ pub fn main() !void {
 
 // Here we define the instruction that we want to encode and test.
 fn inst_to_encode(writer: *std.io.Writer) EncodingError!void {
-    // Probe missing/edge cases
-    _ = try mov.rm64_r64(writer, .{ .mem = .{ .baseIndex64 = .{ .base = .R12 } } }, .RAX);
-    _ = try mov.r64_rm64(writer, .RAX, .{ .mem = .{ .baseIndex64 = .{ .base = .R12 } } });
+    _ = try mov.rm64_r64(
+        writer,
+        .{ .mem = .{ .baseIndex32 = .{
+            .base = .EBX,
+            .index = .{ .reg = .ECX, .scale = .x2 },
+        } } },
+        .RAX,
+    );
+    _ = try mov.r64_rm64(
+        writer,
+        .RAX,
+        .{ .mem = .{ .baseIndex32 = .{
+            .base = .EBX,
+            .index = .{ .reg = .ECX, .scale = .x2 },
+        } } },
+    );
 
-    _ = try mov.rm64_r64(writer, .{ .mem = .{ .baseIndex64 = .{ .base = .R13 } } }, .RAX);
-    _ = try mov.r64_rm64(writer, .RAX, .{ .mem = .{ .baseIndex64 = .{ .base = .R13 } } });
+    _ = try mov.rm64_r64(writer, .{ .mem = .{ .baseIndex32 = .{ .base = .R8D } } }, .RAX);
+    _ = try mov.r64_rm64(writer, .RAX, .{ .mem = .{ .baseIndex32 = .{ .base = .R8D } } });
 
-    _ = try mov.rm64_r64(writer, .{ .mem = .{ .baseIndex64 = .{ .base = .RAX, .disp = -128 } } }, .RCX);
-    _ = try mov.rm64_r64(writer, .{ .mem = .{ .baseIndex64 = .{ .base = .RAX, .disp = -129 } } }, .RCX);
-    _ = try mov.rm64_r64(writer, .{ .mem = .{ .baseIndex64 = .{ .base = .RAX, .disp = 127 } } }, .RCX);
-    _ = try mov.rm64_r64(writer, .{ .mem = .{ .baseIndex64 = .{ .base = .RAX, .disp = 128 } } }, .RCX);
+    _ = try mov.rm64_imm32(writer, .{ .mem = .{ .baseIndex32 = .{ .base = .EBP } } }, 0x1122_3344);
 
     _ = try mov.rm64_r64(
         writer,
-        .{ .mem = .{ .baseIndex64 = .{
+        .{ .mem = .{ .baseIndex32 = .{
             .base = null,
-            .index = .{ .reg = .RCX, .scale = .x4 },
+            .index = .{ .reg = .ECX, .scale = .x4 },
             .disp = 0x1234,
         } } },
         .RAX,
