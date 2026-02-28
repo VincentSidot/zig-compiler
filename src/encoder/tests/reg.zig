@@ -7,7 +7,7 @@ const EncodingError = error_file.EncodingError;
 
 const RegisterIndex_64 = reg_file.RegisterIndex_64;
 const Scale = reg_file.Scale;
-const Index = reg_file.Index;
+const Index_64 = reg_file.Index_64;
 const Memory = reg_file.Memory;
 const RegisterMemory_64 = reg_file.RegisterMemory_64;
 
@@ -19,7 +19,7 @@ test "RegMem validate accepts register operand" {
 test "RegMem validate accepts base/index memory operand" {
     const op: RegisterMemory_64 = .{
         .mem = .{
-            .baseIndex = .{
+            .baseIndex64 = .{
                 .base = .RAX,
                 .index = .{ .reg = .RCX, .scale = .x4 },
                 .disp = 16,
@@ -43,7 +43,7 @@ test "RegMem validate accepts RIP-relative memory operand" {
 test "RegMem validate rejects RSP as index register" {
     const op: RegisterMemory_64 = .{
         .mem = .{
-            .baseIndex = .{
+            .baseIndex64 = .{
                 .base = .RAX,
                 .index = .{ .reg = .RSP, .scale = .x2 },
             },
@@ -53,20 +53,7 @@ test "RegMem validate rejects RSP as index register" {
     try std.testing.expectError(EncodingError.InvalidIndexRegister, op.validate());
 }
 
-test "RegMem validate rejects R12 as index register" {
-    const op: RegisterMemory_64 = .{
-        .mem = .{
-            .baseIndex = .{
-                .base = .RAX,
-                .index = .{ .reg = .R12, .scale = .x8 },
-            },
-        },
-    };
-
-    try std.testing.expectError(EncodingError.InvalidIndexRegister, op.validate());
-}
-
 test "Index validate accepts non-restricted index register" {
-    const idx: Index = .{ .reg = .R13, .scale = Scale.x2 };
+    const idx: Index_64 = .{ .reg = .R13, .scale = Scale.x2 };
     try idx.validate();
 }

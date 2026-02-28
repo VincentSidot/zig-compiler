@@ -21,7 +21,7 @@ pub const RegisterMemory_16 = lib_file.RegisterMemory_16;
 pub const RegisterMemory_8 = lib_file.RegisterMemory_8;
 
 fn print_buffer(comptime prefix: []const u8, buff: []const u8) void {
-    eprintf(prefix ++ ": ", .{});
+    eprintf("  {s}: ", .{prefix});
     for (buff) |byte| {
         eprintf("{x:02} ", .{byte});
     }
@@ -41,22 +41,43 @@ pub fn validate(
     dest: Dest,
     source: Src,
 ) !void {
-    eprintf("Validating MOV \"{s}\" instruction: ", .{name});
-
     var buffer: [16]u8 = undefined;
     var writer = std.io.Writer.fixed(&buffer);
 
     const writen = try tested(&writer, dest, source);
 
-    print_buffer("", buffer[0..writen]);
-
     if (writen != expected.len) {
-        eprintf("Expected {d} bytes but got {d}\n", .{ expected.len, writen });
+        eprintf("\n[MOV validation failed] {s}\n", .{name});
+        print_buffer("Actual", buffer[0..writen]);
+        print_buffer("Expected", expected);
+        eprintf("  Length mismatch: expected {d} byte(s), got {d} byte(s)\n", .{ expected.len, writen });
         return error.InvalidEncodingLength;
     }
 
     if (!std.mem.eql(u8, buffer[0..writen], expected)) {
+        eprintf("\n[MOV validation failed] {s}\n", .{name});
+        print_buffer("Actual", buffer[0..writen]);
         print_buffer("Expected", expected);
         return error.InvalidEncodingData;
     }
+}
+
+test "MOV Summary" {
+    const mov_8 = @import("8.zig");
+    const mov_16 = @import("16.zig");
+    const mov_32 = @import("32.zig");
+    const mov_64 = @import("64.zig");
+
+    const mov_8_tests = mov_8.validate_calls.load(.monotonic);
+    const mov_16_tests = mov_16.validate_calls.load(.monotonic);
+    const mov_32_tests = mov_32.validate_calls.load(.monotonic);
+    const mov_64_tests = mov_64.validate_calls.load(.monotonic);
+    const mov_total_tests = mov_8_tests + mov_16_tests + mov_32_tests + mov_64_tests;
+
+    eprintf("\nMOV Validation Summary\n", .{});
+    eprintf("  8-bit  : {d:03}\n", .{mov_8_tests});
+    eprintf("  16-bit : {d:03}\n", .{mov_16_tests});
+    eprintf("  32-bit : {d:03}\n", .{mov_32_tests});
+    eprintf("  64-bit : {d:03}\n", .{mov_64_tests});
+    eprintf("  total  : {d:03}\n", .{mov_total_tests});
 }

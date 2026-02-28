@@ -142,18 +142,25 @@ pub fn main() !void {
 
 // Here we define the instruction that we want to encode and test.
 fn inst_to_encode(writer: *std.io.Writer) EncodingError!void {
-    // BUG: rm64_imm32 with RIP-relative memory is missing REX.W and decodes as DWORD PTR.
-    _ = try mov.rm64_imm32(writer, .{ .mem = .{ .ripRelative = 0x10 } }, 0x1122_3344);
-    _ = try mov.rm32_imm32(writer, .{ .mem = .{ .ripRelative = 0x10 } }, 0x1122_3344);
+    // Probe missing/edge cases
+    _ = try mov.rm64_r64(writer, .{ .mem = .{ .baseIndex64 = .{ .base = .R12 } } }, .RAX);
+    _ = try mov.r64_rm64(writer, .RAX, .{ .mem = .{ .baseIndex64 = .{ .base = .R12 } } });
 
-    _ = try mov.rm64_imm32(writer, .{ .mem = .{ .ripRelative = 0x1234 } }, 0x89AB_CDEF);
+    _ = try mov.rm64_r64(writer, .{ .mem = .{ .baseIndex64 = .{ .base = .R13 } } }, .RAX);
+    _ = try mov.r64_rm64(writer, .RAX, .{ .mem = .{ .baseIndex64 = .{ .base = .R13 } } });
 
-    // Works: rm64_imm32 with register destination emits REX.W and is 64-bit.
-    _ = try mov.rm64_imm32(writer, .{ .reg = .RAX }, 0x1122_3344);
+    _ = try mov.rm64_r64(writer, .{ .mem = .{ .baseIndex64 = .{ .base = .RAX, .disp = -128 } } }, .RCX);
+    _ = try mov.rm64_r64(writer, .{ .mem = .{ .baseIndex64 = .{ .base = .RAX, .disp = -129 } } }, .RCX);
+    _ = try mov.rm64_r64(writer, .{ .mem = .{ .baseIndex64 = .{ .base = .RAX, .disp = 127 } } }, .RCX);
+    _ = try mov.rm64_r64(writer, .{ .mem = .{ .baseIndex64 = .{ .base = .RAX, .disp = 128 } } }, .RCX);
 
-    // Works: mov r64, imm64 form (B8+rd) explicitly emits a 64-bit immediate move.
-    _ = try mov.r64_imm64(writer, .RAX, 0x0000_0000_1122_3344);
-
-    // Works: auto form picks sign-extended imm32-to-r64 (still with REX.W for register destination).
-    _ = try mov.r64_imm64_auto(writer, .RAX, 0x0000_0000_1122_3344);
+    _ = try mov.rm64_r64(
+        writer,
+        .{ .mem = .{ .baseIndex64 = .{
+            .base = null,
+            .index = .{ .reg = .RCX, .scale = .x4 },
+            .disp = 0x1234,
+        } } },
+        .RAX,
+    );
 }

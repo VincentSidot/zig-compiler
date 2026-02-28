@@ -115,10 +115,14 @@ fn factory_mov(
             var writen: usize = 0;
 
             if (source.is_high_register() and dest.need_rex()) {
-                log.err("Moving from high register to register that needs REX prefix is invalid", .{});
+                if (!builtin.is_test) {
+                    log.err("Moving from high register to register that needs REX prefix is invalid", .{});
+                }
                 return error.InvalidOperand;
             } else if (source.need_rex() and dest.is_high_register()) {
-                log.err("Moving from register that needs REX prefix to high register is invalid", .{});
+                if (!builtin.is_test) {
+                    log.err("Moving from register that needs REX prefix to high register is invalid", .{});
+                }
                 return error.InvalidOperand;
             }
 
@@ -145,8 +149,8 @@ fn factory_mov(
                 const rex = rex_bytes(
                     is_64bit, // w bit is set for 64-bit operand size
                     reg.is_extended(),
-                    false, // x bit is not used for MOV reg-reg
-                    rm.is_extended(),
+                    rm.rex_x(),
+                    rm.rex_b(),
                 );
 
                 writen += 1;
@@ -207,11 +211,14 @@ fn factory_mov_imm(comptime Reg: type, comptime Imm: type, comptime opcode: u8) 
             }
 
             if (dest.need_rex() or Reg == RegisterMemory64) {
+                const rex_x = if (dest_is_rm) dest.rex_x() else false;
+                const rex_b = if (dest_is_rm) dest.rex_b() else dest.is_extended();
+
                 const rex = rex_bytes(
                     is_64bit, // w bit is set for 64-bit operand size
                     false,
-                    false,
-                    dest.is_extended(),
+                    rex_x,
+                    rex_b,
                 );
 
                 writen += 1;

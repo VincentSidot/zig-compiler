@@ -2,10 +2,25 @@ const std = @import("std");
 const common = @import("common.zig");
 
 const mov = common.mov;
-const validate = common.validate;
+const validate_impl = common.validate;
 const EncodingError = common.EncodingError;
 const RegisterIndex_64 = common.RegisterIndex_64;
 const RegisterMemory_64 = common.RegisterMemory_64;
+
+pub var validate_calls = std.atomic.Value(usize).init(0);
+
+fn validate(
+    comptime Dest: type,
+    comptime Src: type,
+    comptime name: []const u8,
+    comptime expected: []const u8,
+    tested: fn (writer: *std.io.Writer, dest: Dest, source: Src) EncodingError!usize,
+    dest: Dest,
+    source: Src,
+) !void {
+    _ = validate_calls.fetchAdd(1, .monotonic);
+    try validate_impl(Dest, Src, name, expected, tested, dest, source);
+}
 
 test "MOV 64 bit registers" {
     try validate(RegisterMemory_64, RegisterIndex_64, "RAX, RCX", &.{ 0x48, 0x89, 0xC8 }, mov.rm64_r64, .{ .reg = .RAX }, .RCX);
@@ -93,6 +108,182 @@ test "MOV 64 bit RIP-relative memory" {
         mov.rm64_imm32,
         .{ .mem = .{ .ripRelative = 0x1234 } },
         0x89AB_CDEF,
+    );
+}
+
+test "MOV 64 bit base-index memory (draft encoder)" {
+    try validate(
+        RegisterMemory_64,
+        RegisterIndex_64,
+        "[R8], RAX",
+        &.{ 0x49, 0x89, 0x00 },
+        mov.rm64_r64,
+        .{ .mem = .{ .baseIndex64 = .{ .base = .R8 } } },
+        .RAX,
+    );
+    try validate(
+        RegisterMemory_64,
+        RegisterIndex_64,
+        "[R9 + 4], RAX",
+        &.{ 0x49, 0x89, 0x41, 0x04 },
+        mov.rm64_r64,
+        .{ .mem = .{ .baseIndex64 = .{ .base = .R9, .disp = 4 } } },
+        .RAX,
+    );
+    try validate(
+        RegisterMemory_64,
+        u32,
+        "[RAX + R10*2 - 4], 0x12345678",
+        &.{ 0x4A, 0xC7, 0x44, 0x50, 0xFC, 0x78, 0x56, 0x34, 0x12 },
+        mov.rm64_imm32,
+        .{
+            .mem = .{
+                .baseIndex64 = .{
+                    .base = .RAX,
+                    .index = .{
+                        .reg = .R10,
+                        .scale = .x2,
+                    },
+                    .disp = -4,
+                },
+            },
+        },
+        0x12345678,
+    );
+
+    try validate(
+        RegisterIndex_64,
+        RegisterMemory_64,
+        "RAX, [R8]",
+        &.{ 0x49, 0x8B, 0x00 },
+        mov.r64_rm64,
+        .RAX,
+        .{ .mem = .{ .baseIndex64 = .{ .base = .R8 } } },
+    );
+    try validate(
+        RegisterIndex_64,
+        RegisterMemory_64,
+        "R11, [R9 + 4]",
+        &.{ 0x4D, 0x8B, 0x59, 0x04 },
+        mov.r64_rm64,
+        .R11,
+        .{ .mem = .{ .baseIndex64 = .{ .base = .R9, .disp = 4 } } },
+    );
+    try validate(
+        RegisterMemory_64,
+        RegisterIndex_64,
+        "[RAX + R10*8 + 0x10], R11",
+        &.{ 0x4E, 0x89, 0x5C, 0xD0, 0x10 },
+        mov.rm64_r64,
+        .{
+            .mem = .{
+                .baseIndex64 = .{
+                    .base = .RAX,
+                    .index = .{
+                        .reg = .R10,
+                        .scale = .x8,
+                    },
+                    .disp = 0x10,
+                },
+            },
+        },
+        .R11,
+    );
+}
+
+test "MOV 64 bit base-index memory edge cases" {
+    try validate(
+        RegisterMemory_64,
+        RegisterIndex_64,
+        "[R12], RAX",
+        &.{ 0x49, 0x89, 0x04, 0x24 },
+        mov.rm64_r64,
+        .{ .mem = .{ .baseIndex64 = .{ .base = .R12 } } },
+        .RAX,
+    );
+    try validate(
+        RegisterIndex_64,
+        RegisterMemory_64,
+        "RAX, [R12]",
+        &.{ 0x49, 0x8B, 0x04, 0x24 },
+        mov.r64_rm64,
+        .RAX,
+        .{ .mem = .{ .baseIndex64 = .{ .base = .R12 } } },
+    );
+    try validate(
+        RegisterMemory_64,
+        RegisterIndex_64,
+        "[R13], RAX",
+        &.{ 0x49, 0x89, 0x45, 0x00 },
+        mov.rm64_r64,
+        .{ .mem = .{ .baseIndex64 = .{ .base = .R13 } } },
+        .RAX,
+    );
+    try validate(
+        RegisterIndex_64,
+        RegisterMemory_64,
+        "RAX, [R13]",
+        &.{ 0x49, 0x8B, 0x45, 0x00 },
+        mov.r64_rm64,
+        .RAX,
+        .{ .mem = .{ .baseIndex64 = .{ .base = .R13 } } },
+    );
+
+    try validate(
+        RegisterMemory_64,
+        RegisterIndex_64,
+        "[RAX - 128], RCX",
+        &.{ 0x48, 0x89, 0x48, 0x80 },
+        mov.rm64_r64,
+        .{ .mem = .{ .baseIndex64 = .{ .base = .RAX, .disp = -128 } } },
+        .RCX,
+    );
+    try validate(
+        RegisterMemory_64,
+        RegisterIndex_64,
+        "[RAX - 129], RCX",
+        &.{ 0x48, 0x89, 0x88, 0x7F, 0xFF, 0xFF, 0xFF },
+        mov.rm64_r64,
+        .{ .mem = .{ .baseIndex64 = .{ .base = .RAX, .disp = -129 } } },
+        .RCX,
+    );
+    try validate(
+        RegisterMemory_64,
+        RegisterIndex_64,
+        "[RAX + 127], RCX",
+        &.{ 0x48, 0x89, 0x48, 0x7F },
+        mov.rm64_r64,
+        .{ .mem = .{ .baseIndex64 = .{ .base = .RAX, .disp = 127 } } },
+        .RCX,
+    );
+    try validate(
+        RegisterMemory_64,
+        RegisterIndex_64,
+        "[RAX + 128], RCX",
+        &.{ 0x48, 0x89, 0x88, 0x80, 0x00, 0x00, 0x00 },
+        mov.rm64_r64,
+        .{ .mem = .{ .baseIndex64 = .{ .base = .RAX, .disp = 128 } } },
+        .RCX,
+    );
+    try validate(
+        RegisterMemory_64,
+        RegisterIndex_64,
+        "[RCX*4 + 0x1234], RAX",
+        &.{ 0x48, 0x89, 0x04, 0x8D, 0x34, 0x12, 0x00, 0x00 },
+        mov.rm64_r64,
+        .{
+            .mem = .{
+                .baseIndex64 = .{
+                    .base = null,
+                    .index = .{
+                        .reg = .RCX,
+                        .scale = .x4,
+                    },
+                    .disp = 0x1234,
+                },
+            },
+        },
+        .RAX,
     );
 }
 

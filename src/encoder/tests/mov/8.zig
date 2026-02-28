@@ -2,10 +2,25 @@ const std = @import("std");
 const common = @import("common.zig");
 
 const mov = common.mov;
-const validate = common.validate;
+const validate_impl = common.validate;
 const EncodingError = common.EncodingError;
 const RegisterIndex_8 = common.RegisterIndex_8;
 const RegisterMemory_8 = common.RegisterMemory_8;
+
+pub var validate_calls = std.atomic.Value(usize).init(0);
+
+fn validate(
+    comptime Dest: type,
+    comptime Src: type,
+    comptime name: []const u8,
+    comptime expected: []const u8,
+    tested: fn (writer: *std.io.Writer, dest: Dest, source: Src) EncodingError!usize,
+    dest: Dest,
+    source: Src,
+) !void {
+    _ = validate_calls.fetchAdd(1, .monotonic);
+    try validate_impl(Dest, Src, name, expected, tested, dest, source);
+}
 
 test "MOV 8 bit registers" {
     // 88 c8                   mov    al,cl
