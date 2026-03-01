@@ -24,7 +24,7 @@ fn validate(
     try validate_impl(Dest, Src, name, expected, tested, dest, source);
 }
 
-test "BITWISE 8 bit register and memory forms" {
+test "BITWISE 8 bit register and immediate forms" {
     try validate(RegisterMemory_8, RegisterIndex_8, "AND AL, CL", &.{ 0x20, 0xC8 }, bitand.rm8_r8, .{ .reg = .AL }, .CL);
     try validate(RegisterMemory_8, RegisterIndex_8, "OR AL, CL", &.{ 0x08, 0xC8 }, bitor.rm8_r8, .{ .reg = .AL }, .CL);
     try validate(RegisterMemory_8, RegisterIndex_8, "XOR AL, CL", &.{ 0x30, 0xC8 }, bitxor.rm8_r8, .{ .reg = .AL }, .CL);
@@ -32,16 +32,115 @@ test "BITWISE 8 bit register and memory forms" {
     try validate(RegisterIndex_8, RegisterMemory_8, "AND AL, CL", &.{ 0x22, 0xC1 }, bitand.r8_rm8, .AL, .{ .reg = .CL });
     try validate(RegisterIndex_8, RegisterMemory_8, "OR AL, CL", &.{ 0x0A, 0xC1 }, bitor.r8_rm8, .AL, .{ .reg = .CL });
     try validate(RegisterIndex_8, RegisterMemory_8, "XOR AL, CL", &.{ 0x32, 0xC1 }, bitxor.r8_rm8, .AL, .{ .reg = .CL });
-}
 
-test "BITWISE 8 bit immediate forms" {
     try validate(RegisterMemory_8, u8, "AND AL, 0x7f", &.{ 0x80, 0xE0, 0x7F }, bitand.rm8_imm8, .{ .reg = .AL }, 0x7F);
     try validate(RegisterMemory_8, u8, "OR AL, 0x7f", &.{ 0x80, 0xC8, 0x7F }, bitor.rm8_imm8, .{ .reg = .AL }, 0x7F);
     try validate(RegisterMemory_8, u8, "XOR AL, 0x7f", &.{ 0x80, 0xF0, 0x7F }, bitxor.rm8_imm8, .{ .reg = .AL }, 0x7F);
+}
 
-    try validate(RegisterIndex_8, u8, "AND R9B, 0x01", &.{ 0x41, 0x80, 0xE1, 0x01 }, bitand.r8_imm8, .R9B, 0x01);
-    try validate(RegisterIndex_8, u8, "OR R9B, 0x01", &.{ 0x41, 0x80, 0xC9, 0x01 }, bitor.r8_imm8, .R9B, 0x01);
-    try validate(RegisterIndex_8, u8, "XOR R9B, 0x01", &.{ 0x41, 0x80, 0xF1, 0x01 }, bitxor.r8_imm8, .R9B, 0x01);
+test "BITWISE 8 bit RIP-relative memory" {
+    try validate(
+        RegisterMemory_8,
+        RegisterIndex_8,
+        "AND [RIP + 0x20], AL",
+        &.{ 0x20, 0x05, 0x20, 0x00, 0x00, 0x00 },
+        bitand.rm8_r8,
+        .{ .mem = .{ .ripRelative = 0x20 } },
+        .AL,
+    );
+    try validate(
+        RegisterIndex_8,
+        RegisterMemory_8,
+        "OR AL, [RIP - 4]",
+        &.{ 0x0A, 0x05, 0xFC, 0xFF, 0xFF, 0xFF },
+        bitor.r8_rm8,
+        .AL,
+        .{ .mem = .{ .ripRelative = -4 } },
+    );
+    try validate(
+        RegisterMemory_8,
+        u8,
+        "XOR [RIP + 0x20], 0x7F",
+        &.{ 0x80, 0x35, 0x20, 0x00, 0x00, 0x00, 0x7F },
+        bitxor.rm8_imm8,
+        .{ .mem = .{ .ripRelative = 0x20 } },
+        0x7F,
+    );
+}
+
+test "BITWISE 8 bit base-index64 memory" {
+    try validate(
+        RegisterMemory_8,
+        RegisterIndex_8,
+        "AND [R8], AL",
+        &.{ 0x41, 0x20, 0x00 },
+        bitand.rm8_r8,
+        .{ .mem = .{ .baseIndex64 = .{ .base = .R8 } } },
+        .AL,
+    );
+    try validate(
+        RegisterIndex_8,
+        RegisterMemory_8,
+        "OR R11B, [R9 + 4]",
+        &.{ 0x45, 0x0A, 0x59, 0x04 },
+        bitor.r8_rm8,
+        .R11B,
+        .{ .mem = .{ .baseIndex64 = .{ .base = .R9, .disp = 4 } } },
+    );
+    try validate(
+        RegisterMemory_8,
+        u8,
+        "XOR [RAX + R10*2 - 4], 0x42",
+        &.{ 0x42, 0x80, 0x74, 0x50, 0xFC, 0x42 },
+        bitxor.rm8_imm8,
+        .{
+            .mem = .{
+                .baseIndex64 = .{
+                    .base = .RAX,
+                    .index = .{ .reg = .R10, .scale = .x2 },
+                    .disp = -4,
+                },
+            },
+        },
+        0x42,
+    );
+}
+
+test "BITWISE 8 bit base-index32 memory" {
+    try validate(
+        RegisterMemory_8,
+        RegisterIndex_8,
+        "AND [EBX + ECX*2], AL",
+        &.{ 0x67, 0x20, 0x04, 0x4B },
+        bitand.rm8_r8,
+        .{
+            .mem = .{
+                .baseIndex32 = .{
+                    .base = .EBX,
+                    .index = .{ .reg = .ECX, .scale = .x2 },
+                },
+            },
+        },
+        .AL,
+    );
+    try validate(
+        RegisterIndex_8,
+        RegisterMemory_8,
+        "OR R11B, [addr32:0x1234]",
+        &.{ 0x67, 0x44, 0x0A, 0x1C, 0x25, 0x34, 0x12, 0x00, 0x00 },
+        bitor.r8_rm8,
+        .R11B,
+        .{ .mem = .{ .baseIndex32 = .{ .base = null, .index = null, .disp = 0x1234 } } },
+    );
+    try validate(
+        RegisterMemory_8,
+        u8,
+        "XOR [addr32:0x1234], 0x44",
+        &.{ 0x67, 0x80, 0x34, 0x25, 0x34, 0x12, 0x00, 0x00, 0x44 },
+        bitxor.rm8_imm8,
+        .{ .mem = .{ .baseIndex32 = .{ .base = null, .index = null, .disp = 0x1234 } } },
+        0x44,
+    );
 }
 
 test "BITWISE 8 bit invalid high register and REX combinations" {

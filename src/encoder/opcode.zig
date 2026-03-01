@@ -10,6 +10,7 @@ const RetKind = helper.RetKind;
 
 pub const add = @import("opcode/add.zig");
 pub const sub = @import("opcode/sub.zig");
+pub const cmp = @import("opcode/cmp.zig");
 pub const bitand = @import("opcode/bitand.zig");
 pub const bitor = @import("opcode/bitor.zig");
 pub const bitxor = @import("opcode/bitxor.zig");

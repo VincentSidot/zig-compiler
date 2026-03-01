@@ -23,12 +23,14 @@ test {
     const mov_testing = @import("tests/mov.zig");
     const add_testing = @import("tests/add.zig");
     const sub_testing = @import("tests/sub.zig");
+    const cmp_testing = @import("tests/cmp.zig");
     const bitwise_testing = @import("tests/bitwise.zig");
     const reg_testing = @import("tests/reg.zig");
 
     std.testing.refAllDecls(mov_testing);
     std.testing.refAllDecls(add_testing);
     std.testing.refAllDecls(sub_testing);
+    std.testing.refAllDecls(cmp_testing);
     std.testing.refAllDecls(bitwise_testing);
     std.testing.refAllDecls(reg_testing);
 }
