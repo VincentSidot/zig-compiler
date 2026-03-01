@@ -669,12 +669,24 @@ fn emit_modrm_sib_base_index(
     const SIB_PRESENT: u3 = 0b100;
 
     var written: usize = 0;
+
+    const base_low3: u3 = if (mem.base) |base| base.reg_low3() else NO_BASE;
+
     const has_base = mem.base != null;
     const has_index = mem.index != null;
-    const base_low3: u3 = if (mem.base) |base| base.reg_low3() else NO_BASE;
-    const base_is_mod00_forbidden = has_base and base_low3 == NO_BASE;
-    const need_sib = mem.base_requires_sib() or has_index;
+
+    // Special case: if there's no base register, we must use disp32 addressing mode.
     const force_disp32 = !has_base;
+
+    // Special case: no-base/no-index in base-index addressing must use SIB for absolute disp32.
+    // Otherwise mod=00 rm=101 is interpreted as IP-relative (RIP/EIP depending on addr-size).
+    const force_sib_abs_disp32 = !has_base and !has_index;
+
+    const need_sib = mem.base_requires_sib() or has_index or force_sib_abs_disp32;
+
+    // Special case: mod=00 with rm=101 (no base) is not allowed for memory operands,
+    // because it encodes RIP-relative addressing.
+    const base_is_mod00_forbidden = has_base and base_low3 == NO_BASE;
 
     var mod: u2 = undefined;
     if (force_disp32) {

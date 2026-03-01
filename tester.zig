@@ -142,35 +142,35 @@ pub fn main() !void {
 
 // Here we define the instruction that we want to encode and test.
 fn inst_to_encode(writer: *std.io.Writer) EncodingError!void {
+    // Reproducer: baseIndex32 with no base/index currently takes modrm rm=101 path.
     _ = try mov.rm64_r64(
         writer,
         .{ .mem = .{ .baseIndex32 = .{
-            .base = .EBX,
-            .index = .{ .reg = .ECX, .scale = .x2 },
+            .base = null,
+            .index = null,
+            .disp = 0x1234,
         } } },
         .RAX,
     );
     _ = try mov.r64_rm64(
         writer,
-        .RAX,
+        .R11,
         .{ .mem = .{ .baseIndex32 = .{
-            .base = .EBX,
-            .index = .{ .reg = .ECX, .scale = .x2 },
+            .base = null,
+            .index = null,
+            .disp = 0x1234,
         } } },
     );
-
-    _ = try mov.rm64_r64(writer, .{ .mem = .{ .baseIndex32 = .{ .base = .R8D } } }, .RAX);
-    _ = try mov.r64_rm64(writer, .RAX, .{ .mem = .{ .baseIndex32 = .{ .base = .R8D } } });
-
-    _ = try mov.rm64_imm32(writer, .{ .mem = .{ .baseIndex32 = .{ .base = .EBP } } }, 0x1122_3344);
-
-    _ = try mov.rm64_r64(
+    _ = try mov.rm64_imm32(
         writer,
         .{ .mem = .{ .baseIndex32 = .{
             .base = null,
-            .index = .{ .reg = .ECX, .scale = .x4 },
+            .index = null,
             .disp = 0x1234,
         } } },
-        .RAX,
+        0x1122_3344,
     );
+
+    // Control: explicit RIP-relative form.
+    _ = try mov.rm64_r64(writer, .{ .mem = .{ .ripRelative = 0x1234 } }, .RAX);
 }
