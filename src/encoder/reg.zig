@@ -535,18 +535,17 @@ fn sib(scale: u8, index: u8, base: u8) u8 {
 
 pub fn emit_modrm_sib(
     /// Reg operand type (e.g., RegisterIndex_64, RegisterIndex_32, etc.)
-    /// Note: You can also use void if you want to force a 0 in the reg field
-    /// of the ModR/M byte, which is useful for certain instructions that don't
-    /// use the reg field.
+    /// Note: You can also use u3 if you want to force a specific value for
+    /// the reg field.
     comptime Reg: type,
     comptime Mem: type,
     writer: *Writer,
-    /// In case of Reg being void, pass undefined here to satisfy the type
-    /// system, but it will be ignored.
+    /// In case of Reg being u3, pass the raw ModR/M reg field value (group digit).
+    /// Otherwise pass an index register value.
     reg: Reg,
     rm: Mem,
 ) EncodingError!usize {
-    if (Reg != void) {
+    if (Reg != u3) {
         ensure_index_reg(Reg);
     }
 
@@ -607,7 +606,7 @@ fn emit_modrm_sib_reg_only(
     rm_reg: Mem,
 ) EncodingError!usize {
     ensure_index_reg(Mem);
-    if (Reg != void) {
+    if (Reg != u3) {
         ensure_matching_reg(Mem, Reg);
     }
 
@@ -746,11 +745,12 @@ fn emit_modrm_sib_base_index(
 inline fn compute_reg3(comptime Reg: type, reg: Reg) u3 {
     var reg3: u3 = undefined;
 
-    if (Reg != void) {
+    if (Reg != u3) {
         ensure_index_reg(Reg);
         reg3 = reg.reg_low3();
     } else {
-        reg3 = 0; // Default to 0 if Reg is void
+        // If Reg is u3, caller provides the ModR/M.reg bits directly.
+        reg3 = reg;
     }
 
     return reg3;

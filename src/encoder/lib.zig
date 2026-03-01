@@ -1,9 +1,11 @@
-const mov_file = @import("mov.zig");
+const mov_file = @import("opcode/mov.zig");
+const add_file = @import("opcode/add.zig");
 const reg_file = @import("reg.zig");
 const arithmetic_file = @import("arithmetic.zig");
 const error_file = @import("error.zig");
 
 pub const mov = mov_file.mov;
+pub const add = add_file.add;
 
 pub const EncodingError = error_file.EncodingError;
 
@@ -22,8 +24,10 @@ test {
     const std = @import("std");
 
     const mov_testing = @import("tests/mov.zig");
+    const add_testing = @import("tests/add.zig");
     const reg_testing = @import("tests/reg.zig");
 
     std.testing.refAllDecls(mov_testing);
+    std.testing.refAllDecls(add_testing);
     std.testing.refAllDecls(reg_testing);
 }
