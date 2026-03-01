@@ -74,10 +74,8 @@ test "MOV Summary" {
     const mov_64_tests = mov_64.validate_calls.load(.monotonic);
     const mov_total_tests = mov_8_tests + mov_16_tests + mov_32_tests + mov_64_tests;
 
-    eprintf("\nMOV Validation Summary\n", .{});
-    eprintf("  8-bit  : {d:03}\n", .{mov_8_tests});
-    eprintf("  16-bit : {d:03}\n", .{mov_16_tests});
-    eprintf("  32-bit : {d:03}\n", .{mov_32_tests});
-    eprintf("  64-bit : {d:03}\n", .{mov_64_tests});
-    eprintf("  total  : {d:03}\n", .{mov_total_tests});
+    eprintf(
+        "MOV Summary: 8={d:03} 16={d:03} 32={d:03} 64={d:03} total={d:03}\n",
+        .{ mov_8_tests, mov_16_tests, mov_32_tests, mov_64_tests, mov_total_tests },
+    );
 }

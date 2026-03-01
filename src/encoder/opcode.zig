@@ -9,6 +9,10 @@ const RetKind = helper.RetKind;
 // Operations that can be used in the assembly code.
 
 pub const add = @import("opcode/add.zig");
+pub const sub = @import("opcode/sub.zig");
+pub const bitand = @import("opcode/bitand.zig");
+pub const bitor = @import("opcode/bitor.zig");
+pub const bitxor = @import("opcode/bitxor.zig");
 pub const mov = @import("opcode/mov.zig");
 
 pub fn syscall(writer: *Writer) EncodingError!usize {
