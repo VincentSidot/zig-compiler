@@ -1,11 +1,8 @@
-const mov_file = @import("opcode/mov.zig");
-const add_file = @import("opcode/add.zig");
 const reg_file = @import("reg.zig");
-const arithmetic_file = @import("arithmetic.zig");
+const helper_file = @import("helper.zig");
 const error_file = @import("error.zig");
 
-pub const mov = mov_file.mov;
-pub const add = add_file.add;
+pub const opcode = @import("opcode.zig");
 
 pub const EncodingError = error_file.EncodingError;
 
@@ -18,7 +15,7 @@ pub const RegisterMemory_32 = reg_file.RegisterMemory_32;
 pub const RegisterMemory_16 = reg_file.RegisterMemory_16;
 pub const RegisterMemory_8 = reg_file.RegisterMemory_8;
 
-pub const extractBits = arithmetic_file.extractBits;
+pub const extractBits = helper_file.extractBits;
 
 test {
     const std = @import("std");

@@ -3,8 +3,8 @@ const std = @import("std");
 const error_file = @import("error.zig");
 const EncodingError = error_file.EncodingError;
 
-const arithmetic = @import("arithmetic.zig");
-const extractBits = arithmetic.extractBits;
+const helper = @import("helper.zig");
+const extractBits = helper.extractBits;
 
 const register = @import("reg.zig");
 

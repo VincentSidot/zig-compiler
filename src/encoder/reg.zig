@@ -4,8 +4,8 @@ const Writer = std.io.Writer;
 const error_file = @import("error.zig");
 const EncodingError = error_file.EncodingError;
 
-const arithmetic_file = @import("arithmetic.zig");
-const extractBits = arithmetic_file.extractBits;
+const helper_file = @import("helper.zig");
+const extractBits = helper_file.extractBits;
 
 fn factory_reg_low3(comptime T: type) fn (value: T) callconv(.@"inline") u3 {
     return struct {

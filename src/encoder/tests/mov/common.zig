@@ -4,9 +4,9 @@ const helper = @import("../../../helper.zig");
 const eprintf = helper.eprintf;
 
 const lib_file = @import("../../lib.zig");
-const mov_file = @import("../../opcode/mov.zig");
+const opcode = @import("../../opcode.zig");
 
-pub const mov = mov_file.mov;
+pub const mov = opcode.mov;
 pub const EncodingError = lib_file.EncodingError;
 
 // Index registers

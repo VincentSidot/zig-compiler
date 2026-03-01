@@ -1,0 +1,46 @@
+const std = @import("std");
+const enc_error = @import("error.zig");
+const helper = @import("helper.zig");
+
+const Writer = std.io.Writer;
+const EncodingError = enc_error.EncodingError;
+const RetKind = helper.RetKind;
+
+// Operations that can be used in the assembly code.
+
+pub const add = @import("opcode/add.zig");
+pub const mov = @import("opcode/mov.zig");
+
+pub fn syscall(writer: *Writer) EncodingError!usize {
+    const SYSCALL_OPCODE = [2]u8{
+        0x0F,
+        0x05,
+    };
+
+    const written: usize = 2; // syscall number for write
+    writer.writeAll(&SYSCALL_OPCODE) catch {
+        return EncodingError.WriterError;
+    };
+
+    return written;
+}
+
+pub fn ret(writer: *Writer, kind: RetKind) EncodingError!usize {
+    const RET_OPCODE_NEAR: u8 = 0xC3;
+    const RET_OPCODE_FAR: u8 = 0xCB;
+
+    var opcode: u8 = undefined;
+
+    if (kind == RetKind.Near) {
+        opcode = RET_OPCODE_NEAR;
+    } else {
+        opcode = RET_OPCODE_FAR;
+    }
+
+    const written: usize = 1; // syscall number for write
+    writer.writeByte(opcode) catch {
+        return EncodingError.WriterError;
+    };
+
+    return written;
+}

@@ -21,13 +21,38 @@ pub const std_options: std.Options = .{
 };
 
 pub fn main() !void {
-    printf("Hello, World!\n", .{});
+
+    // Encode a simple function that print string
+    const bufferSize = 512;
+    var buffer: [bufferSize]u8 = undefined;
+    var writer: std.io.Writer = std.io.Writer.fixed(&buffer);
+    var written: usize = 0;
+
+    written += try encoder.opcode.mov.r64_r64(&writer, .RDX, .RSI);
+    written += try encoder.opcode.mov.r64_r64(&writer, .RSI, .RDI);
+    written += try encoder.opcode.mov.rm64_imm32(
+        &writer,
+        .{ .reg = .RDI },
+        0x1, // STDOUT file descriptor
+    );
+    written += try encoder.opcode.mov.rm64_imm32(
+        &writer,
+        .{ .reg = .RAX },
+        0x1, // SYS_write syscall number
+    );
+    written += try encoder.opcode.syscall(&writer);
+    written += try encoder.opcode.ret(&writer, .Near);
 
     // Prints to stderr, ignoring potential errors.
-    const path = "./compiled/out.bin";
-    const func = try runner.load(path);
+    const func = try runner.load_from_memory(buffer[0..written]);
     defer func.deinit();
 
-    log.info("Executing loaded function from {s}", .{path});
-    func.call("Hello from Zig!\n");
+    // // Load from file
+    // const path = "./compiled/out2.bin";
+    // const func = try runner.load_from_file(path);
+    // defer func.deinit();
+
+    const message = "Hello from Zig!\n";
+
+    func.call(message);
 }

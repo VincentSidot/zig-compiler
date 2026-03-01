@@ -9,3 +9,8 @@ pub inline fn extractBits(comptime T: type, value: T) [@sizeOf(T)]u8 {
 
     return @bitCast(if (target_endian == native_endian) value else @byteSwap(value));
 }
+
+pub const RetKind = enum {
+    Far,
+    Near,
+};
