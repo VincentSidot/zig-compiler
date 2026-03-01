@@ -24,6 +24,10 @@ test {
     const add_testing = @import("tests/add.zig");
     const sub_testing = @import("tests/sub.zig");
     const cmp_testing = @import("tests/cmp.zig");
+    const call_testing = @import("tests/call.zig");
+    const push_testing = @import("tests/push.zig");
+    const pop_testing = @import("tests/pop.zig");
+    const lea_testing = @import("tests/lea.zig");
     const bitwise_testing = @import("tests/bitwise.zig");
     const reg_testing = @import("tests/reg.zig");
 
@@ -31,6 +35,10 @@ test {
     std.testing.refAllDecls(add_testing);
     std.testing.refAllDecls(sub_testing);
     std.testing.refAllDecls(cmp_testing);
+    std.testing.refAllDecls(call_testing);
+    std.testing.refAllDecls(push_testing);
+    std.testing.refAllDecls(pop_testing);
+    std.testing.refAllDecls(lea_testing);
     std.testing.refAllDecls(bitwise_testing);
     std.testing.refAllDecls(reg_testing);
 }

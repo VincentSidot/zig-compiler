@@ -43,7 +43,7 @@ pub fn main() !void {
     written += try encoder.opcode.syscall(&writer);
     written += try encoder.opcode.ret(&writer, .Near);
 
-    // Prints to stderr, ignoring potential errors.
+    // Load from memory
     const func = try runner.load_from_memory(buffer[0..written]);
     defer func.deinit();
 
