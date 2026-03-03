@@ -68,6 +68,34 @@ pub fn rel32(writer: *Writer, disp: i32) EncodingError!usize {
     return written;
 }
 
+/// Backpatch a `jmp rel8` encoded at `op_addr`.
+/// `patch_value` is the absolute target address (within `buffer`) to jump to.
+pub fn patch_rel8(buffer: []u8, op_addr: usize, patch_value: usize) EncodingError!void {
+    if (op_addr + 2 > buffer.len) {
+        return EncodingError.InvalidPatchAddress;
+    }
+
+    const next_ip = op_addr + 2;
+    const delta: i64 = @as(i64, @intCast(patch_value)) - @as(i64, @intCast(next_ip));
+    const disp: i8 = std.math.cast(i8, delta) orelse return EncodingError.InvalidDisplacement;
+    const bytes = extractBits(i8, disp);
+    @memcpy(buffer[op_addr + 1 .. op_addr + 2], bytes[0..]);
+}
+
+/// Backpatch a `jmp rel32` encoded at `op_addr`.
+/// `patch_value` is the absolute target address (within `buffer`) to jump to.
+pub fn patch_rel32(buffer: []u8, op_addr: usize, patch_value: usize) EncodingError!void {
+    if (op_addr + 5 > buffer.len) {
+        return EncodingError.InvalidPatchAddress;
+    }
+
+    const next_ip = op_addr + 5;
+    const delta: i64 = @as(i64, @intCast(patch_value)) - @as(i64, @intCast(next_ip));
+    const disp: i32 = std.math.cast(i32, delta) orelse return EncodingError.InvalidDisplacement;
+    const bytes = extractBits(i32, disp);
+    @memcpy(buffer[op_addr + 1 .. op_addr + 5], bytes[0..]);
+}
+
 /// jmp r/m64 (FF /4)
 pub fn rm64(writer: *Writer, dest: RegisterMemory64) EncodingError!usize {
     var written: usize = 0;

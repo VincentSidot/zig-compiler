@@ -17,6 +17,18 @@ pub const RegisterMemory_8 = reg_file.RegisterMemory_8;
 
 pub const extractBits = helper_file.extractBits;
 
+pub const register = struct {
+    pub const r64 = RegisterIndex_64;
+    pub const r32 = RegisterIndex_32;
+    pub const r16 = RegisterIndex_16;
+    pub const r8 = RegisterIndex_8;
+
+    pub const m64 = RegisterMemory_64;
+    pub const m32 = RegisterMemory_32;
+    pub const m16 = RegisterMemory_16;
+    pub const m8 = RegisterMemory_8;
+};
+
 test {
     const std = @import("std");
 

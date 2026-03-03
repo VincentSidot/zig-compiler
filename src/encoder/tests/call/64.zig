@@ -35,6 +35,40 @@ test "CALL rel32 forms" {
     try validate_rel32("disp -6", &.{ 0xE8, 0xFA, 0xFF, 0xFF, 0xFF }, -6);
 }
 
+test "CALL patch_rel32 patches forward/backward targets" {
+    _ = validate_calls.fetchAdd(1, .monotonic);
+
+    var buffer = [_]u8{
+        0xE8, 0x00, 0x00, 0x00, 0x00, // call at 0
+        0x90, 0x90, 0x90, 0x90, 0x90, // filler
+        0xE8, 0x00, 0x00, 0x00, 0x00, // call at 10
+    };
+
+    try call.patch_rel32(buffer[0..], 0, 0x20);
+    try std.testing.expectEqualSlices(u8, &.{ 0x1B, 0x00, 0x00, 0x00 }, buffer[1..5]);
+
+    try call.patch_rel32(buffer[0..], 10, 2);
+    try std.testing.expectEqualSlices(u8, &.{ 0xF3, 0xFF, 0xFF, 0xFF }, buffer[11..15]);
+}
+
+test "CALL patch_rel32 returns InvalidPatchAddress" {
+    _ = validate_calls.fetchAdd(1, .monotonic);
+
+    var buffer = [_]u8{ 0xE8, 0x00, 0x00, 0x00 };
+    try std.testing.expectError(EncodingError.InvalidPatchAddress, call.patch_rel32(buffer[0..], 0, 0));
+}
+
+test "CALL patch_rel32 returns InvalidDisplacement" {
+    _ = validate_calls.fetchAdd(1, .monotonic);
+
+    var buffer = [_]u8{ 0xE8, 0x00, 0x00, 0x00, 0x00 };
+    const too_far_target = @as(usize, @intCast(@as(i64, std.math.maxInt(i32)) + 6));
+    try std.testing.expectError(
+        EncodingError.InvalidDisplacement,
+        call.patch_rel32(buffer[0..], 0, too_far_target),
+    );
+}
+
 test "CALL register forms" {
     try validate(RegisterIndex_64, "RAX", &.{ 0xFF, 0xD0 }, call.r64, .RAX);
     try validate(RegisterIndex_64, "R9", &.{ 0x41, 0xFF, 0xD1 }, call.r64, .R9);

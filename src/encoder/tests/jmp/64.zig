@@ -48,6 +48,62 @@ test "JMP rel forms" {
     try validate_rel32("disp -6", &.{ 0xE9, 0xFA, 0xFF, 0xFF, 0xFF }, -6);
 }
 
+test "JMP patch_rel8 patches forward/backward targets" {
+    _ = validate_calls.fetchAdd(1, .monotonic);
+
+    var buffer = [_]u8{
+        0xEB, 0x00, // jmp rel8 at 0
+        0x90, 0x90, 0x90, 0x90, // filler
+        0xEB, 0x00, // jmp rel8 at 6
+    };
+
+    try jmp.patch_rel8(buffer[0..], 0, 8);
+    try std.testing.expectEqualSlices(u8, &.{0x06}, buffer[1..2]);
+
+    try jmp.patch_rel8(buffer[0..], 6, 2);
+    try std.testing.expectEqualSlices(u8, &.{0xFA}, buffer[7..8]);
+}
+
+test "JMP patch_rel32 patches forward/backward targets" {
+    _ = validate_calls.fetchAdd(1, .monotonic);
+
+    var buffer = [_]u8{
+        0xE9, 0x00, 0x00, 0x00, 0x00, // jmp rel32 at 0
+        0x90, 0x90, 0x90, // filler
+        0xE9, 0x00, 0x00, 0x00, 0x00, // jmp rel32 at 8
+    };
+
+    try jmp.patch_rel32(buffer[0..], 0, 0x20);
+    try std.testing.expectEqualSlices(u8, &.{ 0x1B, 0x00, 0x00, 0x00 }, buffer[1..5]);
+
+    try jmp.patch_rel32(buffer[0..], 8, 4);
+    try std.testing.expectEqualSlices(u8, &.{ 0xF7, 0xFF, 0xFF, 0xFF }, buffer[9..13]);
+}
+
+test "JMP patch_rel8 returns errors" {
+    _ = validate_calls.fetchAdd(1, .monotonic);
+
+    var short = [_]u8{0xEB};
+    try std.testing.expectError(EncodingError.InvalidPatchAddress, jmp.patch_rel8(short[0..], 0, 0));
+
+    var rel8 = [_]u8{ 0xEB, 0x00 };
+    try std.testing.expectError(EncodingError.InvalidDisplacement, jmp.patch_rel8(rel8[0..], 0, 130));
+}
+
+test "JMP patch_rel32 returns errors" {
+    _ = validate_calls.fetchAdd(1, .monotonic);
+
+    var short = [_]u8{ 0xE9, 0x00, 0x00, 0x00 };
+    try std.testing.expectError(EncodingError.InvalidPatchAddress, jmp.patch_rel32(short[0..], 0, 0));
+
+    var rel32 = [_]u8{ 0xE9, 0x00, 0x00, 0x00, 0x00 };
+    const too_far_target = @as(usize, @intCast(@as(i64, std.math.maxInt(i32)) + 6));
+    try std.testing.expectError(
+        EncodingError.InvalidDisplacement,
+        jmp.patch_rel32(rel32[0..], 0, too_far_target),
+    );
+}
+
 test "JMP register forms" {
     try validate(RegisterIndex_64, "RAX", &.{ 0xFF, 0xE0 }, jmp.r64, .RAX);
     try validate(RegisterIndex_64, "R9", &.{ 0x41, 0xFF, 0xE1 }, jmp.r64, .R9);

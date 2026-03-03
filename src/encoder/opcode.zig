@@ -42,7 +42,7 @@ pub fn ret(writer: *Writer, kind: RetKind) EncodingError!usize {
 
     var opcode: u8 = undefined;
 
-    if (kind == RetKind.Near) {
+    if (kind == RetKind.Near or kind == RetKind.Default) {
         opcode = RET_OPCODE_NEAR;
     } else {
         opcode = RET_OPCODE_FAR;

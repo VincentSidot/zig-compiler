@@ -11,6 +11,7 @@ pub inline fn extractBits(comptime T: type, value: T) [@sizeOf(T)]u8 {
 }
 
 pub const RetKind = enum {
+    Default,
     Far,
     Near,
 };

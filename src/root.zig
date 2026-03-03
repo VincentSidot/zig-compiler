@@ -3,4 +3,7 @@ const std = @import("std");
 
 test {
     std.testing.refAllDecls(@import("./encoder/lib.zig"));
+    std.testing.refAllDecls(@import("./brainfuck/lib.zig"));
+    std.testing.refAllDecls(@import("./brainfuck/runner.zig"));
+    std.testing.refAllDecls(@import("./brainfuck/tokenizer.zig"));
 }

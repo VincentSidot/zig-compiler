@@ -1,12 +1,6 @@
 const std = @import("std");
 const log = std.log;
 
-// Runner module for loading and executing code from memory.
-const runner = @import("runner.zig");
-
-// Encoder module for encoding assembly instructions.
-const encoder = @import("encoder/lib.zig");
-
 // Helper function for printing logic
 const helper = @import("helper.zig");
 const logFunctionMake = helper.logFunctionMake;
@@ -20,82 +14,69 @@ pub const std_options: std.Options = .{
     .log_level = .debug,
 };
 
-fn patch_rel32(buffer: []u8, disp_pos: usize, next_ip: usize, target_ip: usize) !void {
-    const delta: i64 = @as(i64, @intCast(target_ip)) - @as(i64, @intCast(next_ip));
-    const disp: i32 = std.math.cast(i32, delta) orelse return error.InvalidDisplacement;
-    const bytes = encoder.extractBits(i32, disp);
-    @memcpy(buffer[disp_pos .. disp_pos + 4], bytes[0..]);
-}
-
-fn patch_rel8(buffer: []u8, disp_pos: usize, next_ip: usize, target_ip: usize) !void {
-    const delta: i64 = @as(i64, @intCast(target_ip)) - @as(i64, @intCast(next_ip));
-    const disp: i8 = std.math.cast(i8, delta) orelse return error.InvalidDisplacement;
-    const bytes = encoder.extractBits(i8, disp);
-    @memcpy(buffer[disp_pos .. disp_pos + 1], bytes[0..]);
-}
-
 pub fn main() !void {
+    const allocator = std.heap.smp_allocator;
+    const brainfuck = @import("brainfuck/lib.zig");
+    const args = try std.process.argsAlloc(allocator);
+    defer std.process.argsFree(allocator, args);
 
-    // Encode asm/test.s with the encoder.
-    const bufferSize = 512;
-    var buffer: [bufferSize]u8 = undefined;
-    var writer: std.io.Writer = std.io.Writer.fixed(&buffer);
-    var written: usize = 0;
+    var output_path: ?[]const u8 = null;
+    var i: usize = 1;
+    while (i < args.len) : (i += 1) {
+        const arg = args[i];
+        if (std.mem.eql(u8, arg, "-o") or std.mem.eql(u8, arg, "--output")) {
+            i += 1;
+            if (i >= args.len) return error.MissingOutputPath;
+            output_path = args[i];
+            continue;
+        }
 
-    // puts:
-    //   mov r8, rdi
-    //   call strlen
-    //   mov rdx, rax
-    //   mov rsi, r8
-    //   mov rdi, 1
-    //   mov rax, 1
-    //   syscall
-    //   ret
-    written += try encoder.opcode.mov.r64_r64(&writer, .R8, .RDI);
+        return error.InvalidArgument;
+    }
 
-    const call_strlen_disp_pos = written + 1;
-    written += try encoder.opcode.call.rel32(&writer, 0);
+    var tape = [_]u8{0} ** 30_000;
 
-    written += try encoder.opcode.mov.r64_r64(&writer, .RDX, .RAX);
-    written += try encoder.opcode.mov.r64_r64(&writer, .RSI, .R8);
-    written += try encoder.opcode.mov.rm64_imm32(&writer, .{ .reg = .RDI }, 1);
-    written += try encoder.opcode.mov.rm64_imm32(&writer, .{ .reg = .RAX }, 1);
-    written += try encoder.opcode.syscall(&writer);
-    written += try encoder.opcode.ret(&writer, .Near);
+    printf("Loading brainfuck code from file...\n", .{});
 
-    // strlen:
-    const strlen_label = written;
-    written += try encoder.opcode.bitxor.r64_rm64(&writer, .RAX, .{ .reg = .RAX }); // xor rax, rax
+    var interpreter = try brainfuck.load_file(allocator, "brainfuck/hello.bf");
+    defer interpreter.deinit();
 
-    const loop_label = written;
-    written += try encoder.opcode.cmp.rm8_imm8(
-        &writer,
-        .{ .mem = .{ .baseIndex64 = .{ .base = .RDI } } },
-        0,
-    );
+    printf("Interpreting brainfuck code...\n", .{});
 
-    const je_done_disp_pos = written + 1;
-    written += try encoder.opcode.jcc.jz_rel8(&writer, 0);
+    try interpreter.interpret(&tape);
 
-    written += try encoder.opcode.add.r64_imm32(&writer, .RAX, 1); // inc rax
-    written += try encoder.opcode.add.r64_imm32(&writer, .RDI, 1); // inc rdi
+    printf("Done interpreting brainfuck code.\n", .{});
 
-    const jmp_loop_disp_pos = written + 1;
-    written += try encoder.opcode.jmp.rel8(&writer, 0);
+    printf("Compiling brainfuck code to machine code...\n", .{});
+    // Compile the brainfuck code to machine code.
+    const compiled = try brainfuck.compile(&interpreter);
+    defer compiled.deinit();
 
-    const done_label = written;
-    written += try encoder.opcode.ret(&writer, .Near);
+    if (output_path) |path| {
+        try write_file(path, compiled.raw);
+        printf("Wrote compiled code to {s}\n", .{path});
+    }
 
-    // Patch branch/call displacements.
-    try patch_rel32(buffer[0..written], call_strlen_disp_pos, call_strlen_disp_pos + 4, strlen_label);
-    try patch_rel8(buffer[0..written], je_done_disp_pos, je_done_disp_pos + 1, done_label);
-    try patch_rel8(buffer[0..written], jmp_loop_disp_pos, jmp_loop_disp_pos + 1, loop_label);
+    printf("Executing brainfuck code...\n", .{});
 
-    // Load from memory
-    const func = try runner.load_from_memory(buffer[0..written]);
-    defer func.deinit();
+    @memset(&tape, 0);
+    compiled.execute(&tape);
 
-    const message = "Hello from Zig!\n";
+    printf("Done executing brainfuck code.\n", .{});
+}
 
-    func.call(message);
+fn write_file(path: []const u8, data: []const u8) !void {
+    if (std.fs.path.dirname(path)) |dir| {
+        if (dir.len > 0) {
+            try std.fs.cwd().makePath(dir);
+        }
+    }
+
+    const file = if (std.fs.path.isAbsolute(path))
+        try std.fs.createFileAbsolute(path, .{ .truncate = true })
+    else
+        try std.fs.cwd().createFile(path, .{ .truncate = true });
+    defer file.close();
+
+    try file.writeAll(data);
 }

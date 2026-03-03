@@ -46,6 +46,20 @@ pub fn rel32(writer: *Writer, disp: i32) EncodingError!usize {
     return written;
 }
 
+/// Backpatch a `call rel32` encoded at `op_addr`.
+/// `patch_value` is the absolute target address (within `buffer`) to call.
+pub fn patch_rel32(buffer: []u8, op_addr: usize, patch_value: usize) EncodingError!void {
+    if (op_addr + 5 > buffer.len) {
+        return EncodingError.InvalidPatchAddress;
+    }
+
+    const next_ip = op_addr + 5;
+    const delta: i64 = @as(i64, @intCast(patch_value)) - @as(i64, @intCast(next_ip));
+    const disp: i32 = std.math.cast(i32, delta) orelse return EncodingError.InvalidDisplacement;
+    const bytes = extractBits(i32, disp);
+    @memcpy(buffer[op_addr + 1 .. op_addr + 5], bytes[0..]);
+}
+
 /// call r/m64 (FF /2)
 pub fn rm64(writer: *Writer, dest: RegisterMemory64) EncodingError!usize {
     var written: usize = 0;
