@@ -257,10 +257,6 @@ fn compile_inner(interpreted: *BrainfuckInterpreter) ![]u8 {
     return try writer_alloc.toOwnedSlice();
 }
 
-fn diff(a: usize, b: usize) i32 {
-    return @as(i32, @intCast(a)) - @as(i32, @intCast(b));
-}
-
 fn sys_tape_arg3(comptime TAPE_REG: reg.r64, writer: *Writer, sys: usize, arg1: usize, arg2: usize) !usize {
     var written: usize = 0;
 

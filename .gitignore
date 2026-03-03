@@ -6,3 +6,5 @@ temp/
 
 
 *.bin
+output.zig.merged
+/merge_file.zig
