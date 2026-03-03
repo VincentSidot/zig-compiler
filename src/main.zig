@@ -50,7 +50,6 @@ pub fn main() !void {
         .interpret => {
             printf("Interpreting brainfuck code...\n", .{});
             try interpreter.interpret(&tape);
-            printf("Done interpreting brainfuck code.\n", .{});
         },
         .jit => {
             printf("Compiling brainfuck code to machine code...\n", .{});
@@ -63,8 +62,7 @@ pub fn main() !void {
             }
 
             printf("Executing brainfuck code...\n", .{});
-            compiled.execute(&tape);
-            printf("Done executing brainfuck code.\n", .{});
+            try compiled.execute(&tape);
         },
     }
 }

@@ -2,6 +2,10 @@ const std = @import("std");
 const lexer = @import("lexer.zig");
 const tokenizer = @import("tokenizer.zig");
 
+const helper = @import("../helper.zig");
+const setRawMode = helper.setRawMode;
+const restoreTerminal = helper.restoreTerminal;
+
 pub const Token = tokenizer.Token;
 pub const TokenKind = tokenizer.TokenKind;
 pub const Lexer = lexer.Lexer;
@@ -27,6 +31,9 @@ pub fn interpret(self: *const BrainfuckInterpreter, mem: []u8) !void {
     if (mem.len == 0) {
         return error.EmptyMemory;
     }
+
+    try setRawMode();
+    defer restoreTerminal() catch {};
 
     const stdout = std.fs.File.stdout();
     const stdin = std.fs.File.stdin();

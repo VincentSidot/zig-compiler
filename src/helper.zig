@@ -1,5 +1,5 @@
 const std = @import("std");
-const system = std.os.linux;
+const posix = std.posix;
 
 const s_print = fn (comptime format: []const u8, args: anytype) void;
 
@@ -72,4 +72,45 @@ pub fn logFunctionMake(comptime buffer_size: usize, comptime noop: bool) logFunc
     };
 
     return if (noop) _inner.noLogFunction else _inner.logFunction;
+}
+
+var previousTermios: ?posix.termios = null;
+
+pub fn setRawMode() !void {
+    if (previousTermios != null) {
+        return error.AlreadyInRawMode;
+    }
+
+    if (!posix.isatty(posix.STDIN_FILENO)) {
+        return;
+    }
+
+    // Save the current terminal settings
+    previousTermios = posix.tcgetattr(posix.STDIN_FILENO) catch {
+        previousTermios = null;
+        return error.GetTermiosFailed;
+    };
+    var raw: posix.termios = previousTermios.?;
+    // Disable canonical mode and echo
+    raw.lflag.ICANON = false;
+    raw.lflag.ECHO = false;
+
+    // No timeouts, return immediately
+    // raw.cc[@intFromEnum(posix.V.MIN)] = 0;
+    // raw.cc[@intFromEnum(posix.V.TIME)] = 0;
+
+    posix.tcsetattr(posix.STDIN_FILENO, .NOW, raw) catch {
+        return error.SetRawModeFailed;
+    };
+}
+
+pub fn restoreTerminal() !void {
+    if (previousTermios == null) {
+        return;
+    }
+
+    posix.tcsetattr(posix.STDIN_FILENO, .NOW, previousTermios.?) catch {
+        return error.RestoreTerminalFailed;
+    };
+    previousTermios = null;
 }

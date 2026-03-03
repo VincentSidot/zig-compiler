@@ -13,6 +13,10 @@ const BrainfuckInterpreter = runner.BrainfuckInterpreter;
 const loader = @import("../loader.zig");
 const FunctionLoader = loader.FunctionLoader;
 
+const helper = @import("../helper.zig");
+const setRawMode = helper.setRawMode;
+const restoreTerminal = helper.restoreTerminal;
+
 pub const BrainFuckCompiled = @This();
 
 const FnType = fn (mem: *u8) callconv(.c) void;
@@ -48,9 +52,12 @@ pub fn compile(interpreted: *BrainfuckInterpreter) !BrainFuckCompiled {
     };
 }
 
-pub fn execute(compiled: *const BrainFuckCompiled, memory: []u8) void {
+pub fn execute(compiled: *const BrainFuckCompiled, memory: []u8) !void {
     const func = compiled.program.f();
     const ptr: *u8 = &memory[0];
+
+    try setRawMode();
+    defer restoreTerminal() catch {};
 
     func(ptr);
 }
