@@ -1,6 +1,8 @@
 const std = @import("std");
 const log = std.log;
 
+const Writer = std.io.Writer;
+
 const builtin = @import("builtin");
 
 const encoder = @import("../encoder/lib.zig");
@@ -75,8 +77,23 @@ fn compile_inner(interpreted: *BrainfuckInterpreter) ![]u8 {
     var loop_stack = std.ArrayList(usize).empty;
     defer loop_stack.deinit(allocator);
 
-    var putc_stack = std.ArrayList(usize).empty;
-    defer putc_stack.deinit(allocator);
+    const CallStackOp = packed struct {
+        const ValueType = @Type(
+            .{ .int = .{
+                .signedness = std.builtin.Signedness.unsigned,
+                .bits = @bitSizeOf(usize) - 1,
+            } },
+        );
+
+        kind: enum(u1) {
+            PUTC,
+            GETC,
+        },
+        value: ValueType,
+    };
+
+    var call_stack = std.ArrayList(CallStackOp).empty;
+    defer call_stack.deinit(allocator);
 
     // The tape register will hold the current memory cell address.
     // We will use R12 for this purpose.
@@ -131,16 +148,32 @@ fn compile_inner(interpreted: *BrainfuckInterpreter) ![]u8 {
                 );
             },
             .input => {
-                @panic("Not yet implemented");
+                try call_stack.append(allocator, .{
+                    .kind = .GETC,
+                    .value = @intCast(written),
+                });
+                // Placeholder will be backpatched later.
+                written += try op.call.rel32(writer, 0);
             },
             .output => {
                 // Push the position of the call instruction to the stack for
                 // backpatching later.
-                try putc_stack.append(allocator, written);
+                try call_stack.append(allocator, .{
+                    .kind = .PUTC,
+                    .value = @intCast(written),
+                });
                 // Placeholder will be backpatched later.
                 written += try op.call.rel32(writer, 0);
             },
             .loop_start => {
+
+                // Emit cmp byte and 0, to check if the current cell is zero.
+                written += try op.@"test".rm8_imm8(
+                    writer,
+                    .{ .mem = .{ .baseIndex64 = .{ .base = TAPE_REGISTER } } },
+                    0xFF,
+                );
+
                 const loop_start_addr = written;
                 // Placeholder will be backpatched later.
                 written += try op.jcc.jz_rel32(writer, 0);
@@ -155,6 +188,14 @@ fn compile_inner(interpreted: *BrainfuckInterpreter) ![]u8 {
                     return error.UnmatchedLoopEnd;
                 };
                 const loop_body_addr = loop_start_addr + 6; // jcc rel32 size
+
+                // Emit the test instruction to check if the current cell is zero.
+                written += try op.@"test".rm8_imm8(
+                    writer,
+                    .{ .mem = .{ .baseIndex64 = .{ .base = TAPE_REGISTER } } },
+                    0xFF,
+                );
+
                 const loop_end_jnz_addr = written;
 
                 // Emit placeholder backward branch at ']': jnz back to loop body.
@@ -178,34 +219,32 @@ fn compile_inner(interpreted: *BrainfuckInterpreter) ![]u8 {
     // This will be a simple `ret` instruction.
     written += try op.ret(writer, .Default);
 
+    const SYS_read = 0;
+    const SYS_write = 1;
+
+    const STDIN_FD: usize = 0;
+    const STDOUT_FD: usize = 1;
+
     const putc_offset = written;
+    written += try sys_tape_arg3(TAPE_REGISTER, writer, SYS_write, STDOUT_FD, 1);
 
-    // Then setup the putc function.
-    // Backup the tape register on the stack
-    written += try op.push.r64(writer, TAPE_REGISTER);
-
-    // write, 1, buf, size
-    // rax, rdi, rsi, rdx
-
-    // Set the buff to the tape register
-    written += try op.mov.r64_r64(writer, .RSI, TAPE_REGISTER);
-    // Set the size to 1
-    written += try op.mov.r64_imm64_auto(writer, .RDX, 1);
-    // Set the file descriptor for stdout (1)
-    written += try op.mov.r64_imm64_auto(writer, .RDI, 1);
-    // Set the syscall number for write (1)
-    written += try op.mov.r64_imm64_auto(writer, .RAX, 1);
-    // Make the syscall
-    written += try op.syscall(writer);
-    // Restore the tape register from the stack
-    written += try op.pop.r64(writer, TAPE_REGISTER);
-    // Return from the putc function
-    written += try op.ret(writer, .Default);
+    const getc_offset = written;
+    written += try sys_tape_arg3(TAPE_REGISTER, writer, SYS_read, STDIN_FD, 1);
 
     // Backpatch the putc calls with the correct offset to the putc function.
-    while (putc_stack.pop()) |call_addr| {
+    while (call_stack.pop()) |call_addr| {
+        var patch_value: usize = undefined;
+        switch (call_addr.kind) {
+            .GETC => {
+                patch_value = getc_offset;
+            },
+            .PUTC => {
+                patch_value = putc_offset;
+            },
+        }
+
         const buffer = writer.buffer;
-        try op.call.patch_rel32(buffer, call_addr, putc_offset);
+        try op.call.patch_rel32(buffer, call_addr.value, patch_value);
     }
 
     return try writer_alloc.toOwnedSlice();
@@ -213,4 +252,33 @@ fn compile_inner(interpreted: *BrainfuckInterpreter) ![]u8 {
 
 fn diff(a: usize, b: usize) i32 {
     return @as(i32, @intCast(a)) - @as(i32, @intCast(b));
+}
+
+fn sys_tape_arg3(comptime TAPE_REG: reg.r64, writer: *Writer, sys: usize, arg1: usize, arg2: usize) !usize {
+    var written: usize = 0;
+
+    // Backup the tape register on the stack
+    written += try op.push.r64(writer, TAPE_REG);
+
+    if (TAPE_REG != reg.r64.RSI) {
+        // Move the tape register to rsi
+        written += try op.mov.r64_r64(writer, .RSI, TAPE_REG);
+    }
+
+    // Move the syscall arguments to the correct registers
+    written += try op.mov.r64_imm64_auto(writer, .RDX, arg2);
+    written += try op.mov.r64_imm64_auto(writer, .RDI, arg1);
+    // Move the syscall number to rax
+    written += try op.mov.r64_imm64_auto(writer, .RAX, sys);
+
+    // Make the syscall
+    written += try op.syscall(writer);
+
+    // Restore the tape register from the stack
+    written += try op.pop.r64(writer, TAPE_REG);
+
+    // Return from the function
+    written += try op.ret(writer, .Default);
+
+    return written;
 }

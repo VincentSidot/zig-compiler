@@ -14,55 +14,134 @@ pub const std_options: std.Options = .{
     .log_level = .debug,
 };
 
+const CliArgs = struct {
+    const Mode = enum {
+        interpret,
+        jit,
+    };
+
+    input_path: []const u8,
+    output_path: ?[]const u8 = null,
+    mode: Mode = .jit,
+    show_help: bool = false,
+};
+
 pub fn main() !void {
     const allocator = std.heap.smp_allocator;
     const brainfuck = @import("brainfuck/lib.zig");
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    var output_path: ?[]const u8 = null;
-    var i: usize = 1;
-    while (i < args.len) : (i += 1) {
-        const arg = args[i];
-        if (std.mem.eql(u8, arg, "-o") or std.mem.eql(u8, arg, "--output")) {
-            i += 1;
-            if (i >= args.len) return error.MissingOutputPath;
-            output_path = args[i];
-            continue;
-        }
+    const cli_args = try parseArgs(args);
 
-        return error.InvalidArgument;
+    if (cli_args.show_help) {
+        printHelp();
+        return;
     }
 
     var tape = [_]u8{0} ** 30_000;
 
-    printf("Loading brainfuck code from file...\n", .{});
+    printf("Loading brainfuck code from file: {s}\n", .{cli_args.input_path});
 
-    var interpreter = try brainfuck.load_file(allocator, "brainfuck/hello.bf");
+    var interpreter = try brainfuck.load_file(allocator, cli_args.input_path);
     defer interpreter.deinit();
 
-    printf("Interpreting brainfuck code...\n", .{});
+    switch (cli_args.mode) {
+        .interpret => {
+            printf("Interpreting brainfuck code...\n", .{});
+            try interpreter.interpret(&tape);
+            printf("Done interpreting brainfuck code.\n", .{});
+        },
+        .jit => {
+            printf("Compiling brainfuck code to machine code...\n", .{});
+            const compiled = try brainfuck.compile(&interpreter);
+            defer compiled.deinit();
 
-    try interpreter.interpret(&tape);
+            if (cli_args.output_path) |path| {
+                try write_file(path, compiled.raw);
+                printf("Wrote compiled code to {s}\n", .{path});
+            }
 
-    printf("Done interpreting brainfuck code.\n", .{});
+            printf("Executing brainfuck code...\n", .{});
+            compiled.execute(&tape);
+            printf("Done executing brainfuck code.\n", .{});
+        },
+    }
+}
 
-    printf("Compiling brainfuck code to machine code...\n", .{});
-    // Compile the brainfuck code to machine code.
-    const compiled = try brainfuck.compile(&interpreter);
-    defer compiled.deinit();
+fn parseArgs(args: []const []const u8) !CliArgs {
+    var parsed = CliArgs{ .input_path = "" };
 
-    if (output_path) |path| {
-        try write_file(path, compiled.raw);
-        printf("Wrote compiled code to {s}\n", .{path});
+    var i: usize = 1;
+    while (i < args.len) : (i += 1) {
+        const arg = args[i];
+        if (std.mem.eql(u8, arg, "-h") or std.mem.eql(u8, arg, "--help")) {
+            parsed.show_help = true;
+            continue;
+        }
+
+        if (std.mem.eql(u8, arg, "-o") or std.mem.eql(u8, arg, "--output")) {
+            i += 1;
+            if (i >= args.len) {
+                eprintf("Missing value for {s}\n", .{arg});
+                return error.MissingOutputPath;
+            }
+            parsed.output_path = args[i];
+            continue;
+        }
+
+        if (std.mem.eql(u8, arg, "-m") or std.mem.eql(u8, arg, "--mode")) {
+            i += 1;
+            if (i >= args.len) {
+                eprintf("Missing value for {s}\n", .{arg});
+                return error.MissingModeValue;
+            }
+
+            const mode_arg = args[i];
+            if (std.mem.eql(u8, mode_arg, "interpret")) {
+                parsed.mode = .interpret;
+            } else if (std.mem.eql(u8, mode_arg, "jit")) {
+                parsed.mode = .jit;
+            } else {
+                eprintf("Invalid mode: {s}. Expected one of: interpret, jit\n", .{mode_arg});
+                return error.InvalidMode;
+            }
+            continue;
+        }
+
+        if (std.mem.startsWith(u8, arg, "-")) {
+            eprintf("Unknown argument: {s}\n", .{arg});
+            return error.InvalidArgument;
+        }
+
+        if (parsed.input_path.len != 0) {
+            eprintf("Only one input file is supported. Got extra: {s}\n", .{arg});
+            return error.InvalidArgument;
+        }
+
+        parsed.input_path = arg;
     }
 
-    printf("Executing brainfuck code...\n", .{});
+    if (parsed.show_help) return parsed;
 
-    @memset(&tape, 0);
-    compiled.execute(&tape);
+    if (parsed.input_path.len == 0) {
+        eprintf("Missing input brainfuck file path.\n", .{});
+        return error.MissingInputPath;
+    }
 
-    printf("Done executing brainfuck code.\n", .{});
+    return parsed;
+}
+
+fn printHelp() void {
+    printf(
+        \\Usage: rce [options] <input.bf>
+        \\
+        \\Options:
+        \\  -h, --help            Show this help message
+        \\  -m, --mode <mode>     Choose execution mode: interpret | jit (default: jit)
+        \\  -o, --output <path>   Write compiled machine code to file
+        \\
+    , .{});
 }
 
 fn write_file(path: []const u8, data: []const u8) !void {

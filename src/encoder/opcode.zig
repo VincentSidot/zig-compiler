@@ -20,6 +20,8 @@ pub const lea = @import("opcode/lea.zig");
 pub const bitand = @import("opcode/bitand.zig");
 pub const bitor = @import("opcode/bitor.zig");
 pub const bitxor = @import("opcode/bitxor.zig");
+pub const test_op = @import("opcode/test.zig");
+pub const @"test" = test_op;
 pub const mov = @import("opcode/mov.zig");
 
 pub fn syscall(writer: *Writer) EncodingError!usize {
