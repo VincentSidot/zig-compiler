@@ -19,7 +19,7 @@ const ensure_matching_reg = register.ensure_matching_reg;
 const BIT32_ADDRESSING_PREFIX = register.BIT32_ADDRESSING_PREFIX;
 const Register16_LegacyPrefix = 0x66;
 
-const Writer = std.io.Writer;
+const Writer = std.Io.Writer;
 
 pub const ImmediateMode = enum {
     modrm_group,

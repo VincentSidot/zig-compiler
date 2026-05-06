@@ -19,7 +19,7 @@ const emit_modrm_sib = register.emit_modrm_sib;
 const Register64 = register.RegisterIndex_64;
 const RegisterMemory64 = register.RegisterMemory_64;
 
-const Writer = std.io.Writer;
+const Writer = std.Io.Writer;
 const Register16_LegacyPrefix: u8 = 0x66;
 
 const PUSH_OPCODE = struct {

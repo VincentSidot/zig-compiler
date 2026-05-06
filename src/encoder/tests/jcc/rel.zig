@@ -14,7 +14,7 @@ pub var validate_calls = std.atomic.Value(usize).init(0);
 fn validate_rel8(
     comptime name: []const u8,
     comptime expected: []const u8,
-    tested: fn (writer: *std.io.Writer, disp: i8) EncodingError!usize,
+    tested: fn (writer: *std.Io.Writer, disp: i8) EncodingError!usize,
     disp: i8,
 ) !void {
     _ = validate_calls.fetchAdd(1, .monotonic);
@@ -24,7 +24,7 @@ fn validate_rel8(
 fn validate_rel32(
     comptime name: []const u8,
     comptime expected: []const u8,
-    tested: fn (writer: *std.io.Writer, disp: i32) EncodingError!usize,
+    tested: fn (writer: *std.Io.Writer, disp: i32) EncodingError!usize,
     disp: i32,
 ) !void {
     _ = validate_calls.fetchAdd(1, .monotonic);
@@ -132,7 +132,7 @@ test "JCC patch_rel32 returns errors" {
 
 test "JCC writer errors" {
     var buffer: [0]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     try std.testing.expectError(EncodingError.WriterError, jcc.jz_rel8(&writer, 1));
     try std.testing.expectError(EncodingError.WriterError, jcc.jz_rel32(&writer, 1));

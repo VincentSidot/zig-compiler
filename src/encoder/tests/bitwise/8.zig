@@ -16,7 +16,7 @@ fn validate(
     comptime Src: type,
     comptime name: []const u8,
     comptime expected: []const u8,
-    tested: fn (writer: *std.io.Writer, dest: Dest, source: Src) EncodingError!usize,
+    tested: fn (writer: *std.Io.Writer, dest: Dest, source: Src) EncodingError!usize,
     dest: Dest,
     source: Src,
 ) !void {
@@ -145,7 +145,7 @@ test "BITWISE 8 bit base-index32 memory" {
 
 test "BITWISE 8 bit invalid high register and REX combinations" {
     var buffer: [8]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     try std.testing.expectError(EncodingError.InvalidOperand, bitand.rm8_r8(&writer, .{ .reg = .AH }, .R8B));
     try std.testing.expectError(EncodingError.InvalidOperand, bitor.r8_rm8(&writer, .SPL, .{ .reg = .AH }));
@@ -153,6 +153,6 @@ test "BITWISE 8 bit invalid high register and REX combinations" {
 
 test "BITWISE 8 bit writer errors" {
     var buffer: [0]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
     try std.testing.expectError(EncodingError.WriterError, bitxor.rm8_r8(&writer, .{ .reg = .AL }, .CL));
 }

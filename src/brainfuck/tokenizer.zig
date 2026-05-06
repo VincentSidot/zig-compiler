@@ -20,12 +20,12 @@ pub const Token = struct {
     index: usize,
 };
 
-pub fn load_file(allocator: std.mem.Allocator, path: []const u8) ![]Token {
-    const source = try std.fs.cwd().readFileAlloc(allocator, path, std.math.maxInt(usize));
-    defer allocator.free(source);
+// pub fn load_file(allocator: std.mem.Allocator, path: []const u8) ![]Token {
+//     const source = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .unlimited);
+//     defer allocator.free(source);
 
-    return tokenize(allocator, source);
-}
+//     return tokenize(allocator, source);
+// }
 
 pub fn tokenize(allocator: std.mem.Allocator, source: []const u8) ![]Token {
     var line: usize = 1;

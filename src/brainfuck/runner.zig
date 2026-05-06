@@ -16,8 +16,8 @@ pub const BrainfuckInterpreter = @This();
 allocator: std.mem.Allocator,
 program: []Lexer,
 
-pub fn load_file(allocator: std.mem.Allocator, path: []const u8) !BrainfuckInterpreter {
-    const source = try std.fs.cwd().readFileAlloc(allocator, path, std.math.maxInt(usize));
+pub fn load_file(io: std.Io, allocator: std.mem.Allocator, path: []const u8) !BrainfuckInterpreter {
+    const source = try std.Io.Dir.readFileAlloc(std.Io.Dir.cwd(), io, path, allocator, .unlimited);
     defer allocator.free(source);
 
     return try from_source(allocator, source);
@@ -35,8 +35,7 @@ pub fn interpret(self: *const BrainfuckInterpreter, mem: []u8) !void {
     try setRawMode();
     defer restoreTerminal() catch {};
 
-    const stdout = std.fs.File.stdout();
-    const stdin = std.fs.File.stdin();
+    const linux = std.os.linux;
 
     var ip: usize = 0;
     var ptr: usize = 0;
@@ -62,11 +61,16 @@ pub fn interpret(self: *const BrainfuckInterpreter, mem: []u8) !void {
             },
             .output => {
                 const out = [1]u8{mem[ptr]};
-                try stdout.writeAll(&out);
+                const result = linux.write(linux.STDOUT_FILENO, &out, 1);
+
+                if (result != 1) {
+                    return error.OutputError;
+                }
             },
             .input => {
                 var input = [1]u8{0};
-                const bytes_read = try stdin.read(&input);
+                const bytes_read = linux.read(linux.STDIN_FILENO, &input, 1);
+
                 mem[ptr] = if (bytes_read == 0) 0 else input[0];
             },
             .loop_start => {

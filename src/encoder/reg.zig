@@ -1,5 +1,5 @@
 const std = @import("std");
-const Writer = std.io.Writer;
+const Writer = std.Io.Writer;
 
 const error_file = @import("error.zig");
 const EncodingError = error_file.EncodingError;
@@ -372,7 +372,7 @@ pub const Memory = union(enum) {
             .baseIndex32 => |mem32| mem32.validate(),
             .baseIndex64 => |mem64| mem64.validate(),
             // No validation needed for RIP-relative memory
-            .ripRelative => |_| {},
+            .ripRelative => {},
         };
     }
 
@@ -380,7 +380,7 @@ pub const Memory = union(enum) {
         return switch (self) {
             .baseIndex32 => |mem32| mem32.need_index(),
             .baseIndex64 => |mem64| mem64.need_index(),
-            .ripRelative => |_| false, // RIP-relative addressing does not use index registers
+            .ripRelative => false, // RIP-relative addressing does not use index registers
         };
     }
 
@@ -388,7 +388,7 @@ pub const Memory = union(enum) {
         return switch (self) {
             .baseIndex32 => |mem32| mem32.need_base(),
             .baseIndex64 => |mem64| mem64.need_base(),
-            .ripRelative => |_| false, // RIP-relative addressing does not use base registers
+            .ripRelative => false, // RIP-relative addressing does not use base registers
         };
     }
 
@@ -400,7 +400,7 @@ pub const Memory = union(enum) {
             .baseIndex64 => |mem64| {
                 return mem64.need_rex();
             },
-            .ripRelative => |_| false, // RIP-relative addressing does not require REX prefix
+            .ripRelative => false, // RIP-relative addressing does not require REX prefix
         };
     }
 
@@ -408,7 +408,7 @@ pub const Memory = union(enum) {
         return switch (self) {
             .baseIndex32 => |mem32| mem32.rex_b(),
             .baseIndex64 => |mem64| mem64.rex_b(),
-            .ripRelative => |_| false,
+            .ripRelative => false,
         };
     }
 
@@ -416,7 +416,7 @@ pub const Memory = union(enum) {
         return switch (self) {
             .baseIndex32 => |mem32| mem32.rex_x(),
             .baseIndex64 => |mem64| mem64.rex_x(),
-            .ripRelative => |_| false,
+            .ripRelative => false,
         };
     }
 
@@ -428,7 +428,7 @@ pub const Memory = union(enum) {
             .baseIndex64 => |mem64| {
                 return mem64.is_extended();
             },
-            .ripRelative => |_| {
+            .ripRelative => {
                 return false;
             }, // RIP-relative addressing does not involve registers
         }
@@ -436,13 +436,13 @@ pub const Memory = union(enum) {
 
     pub inline fn is_memory32(self: Memory) bool {
         switch (self) {
-            .baseIndex32 => |_| {
+            .baseIndex32 => {
                 return true;
             },
-            .baseIndex64 => |_| {
+            .baseIndex64 => {
                 return false;
             },
-            .ripRelative => |_| {
+            .ripRelative => {
                 return false;
             },
         }
@@ -457,14 +457,14 @@ fn RegMem(comptime R: type) type {
 
         pub inline fn validate(self: Self) EncodingError!void {
             return switch (self) {
-                .reg => |_| {},
+                .reg => {},
                 .mem => |m| m.validate(),
             };
         }
 
         pub inline fn is_memory32(self: Self) bool {
             switch (self) {
-                .reg => |_| {
+                .reg => {
                     return false;
                 },
                 .mem => |m| {
@@ -483,7 +483,7 @@ fn RegMem(comptime R: type) type {
         pub inline fn is_high_register(self: Self) bool {
             return switch (self) {
                 .reg => |r| r.is_high_register(),
-                .mem => |_| false, // Memory operands cannot be high registers
+                .mem => false, // Memory operands cannot be high registers
             };
         }
 
@@ -503,7 +503,7 @@ fn RegMem(comptime R: type) type {
 
         pub inline fn rex_x(self: Self) bool {
             return switch (self) {
-                .reg => |_| false,
+                .reg => false,
                 .mem => |m| m.rex_x(),
             };
         }

@@ -23,27 +23,34 @@ const CliArgs = struct {
     input_path: []const u8,
     output_path: ?[]const u8 = null,
     mode: Mode = .jit,
-    show_help: bool = false,
+    measure_time: bool = false,
 };
 
-pub fn main() !void {
+pub fn main(init: std.process.Init) !void {
     const allocator = std.heap.smp_allocator;
     const brainfuck = @import("brainfuck/lib.zig");
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
 
-    const cli_args = try parseArgs(args);
+    const args = try init.minimal.args.toSlice(allocator);
+    defer allocator.free(args);
 
-    if (cli_args.show_help) {
-        printHelp();
+    const cli_args = try parseArgs(args) orelse {
+        // If parseArgs returns null, it means the user requested help, so we just exit.
         return;
+    };
+
+    const Clock = std.Io.Clock.cpu_process;
+    const io = init.io;
+
+    var startTime: ?std.Io.Timestamp = null;
+    if (cli_args.measure_time) {
+        startTime = Clock.now(io);
     }
 
     var tape = [_]u8{0} ** 30_000;
 
     printf("Loading brainfuck code from file: {s}\n", .{cli_args.input_path});
 
-    var interpreter = try brainfuck.load_file(allocator, cli_args.input_path);
+    var interpreter = try brainfuck.load_file(io, allocator, cli_args.input_path);
     defer interpreter.deinit();
 
     switch (cli_args.mode) {
@@ -57,7 +64,7 @@ pub fn main() !void {
             defer compiled.deinit();
 
             if (cli_args.output_path) |path| {
-                try write_file(path, compiled.raw);
+                try write_file(io, path, compiled.raw);
                 printf("Wrote compiled code to {s}\n", .{path});
             }
 
@@ -65,20 +72,38 @@ pub fn main() !void {
             try compiled.execute(&tape);
         },
     }
+
+    if (startTime) |start| {
+        const elapsed = start.untilNow(io, Clock);
+        const elapsedMs = elapsed.toMilliseconds();
+
+        if (elapsedMs < 100) {
+            const elapsedUs = elapsed.toMicroseconds();
+            if (elapsedUs < 100) {
+                const elapsedNs = elapsed.toNanoseconds();
+                log.info("Execution time: {d} ns", .{elapsedNs});
+            } else {
+                log.info("Execution time: {d} µs", .{elapsedUs});
+            }
+        } else {
+            log.info("Execution time: {d} ms", .{elapsedMs});
+        }
+    }
 }
 
-fn parseArgs(args: []const []const u8) !CliArgs {
+fn parseArgs(args: []const []const u8) !?CliArgs {
     var parsed = CliArgs{ .input_path = "" };
 
     var i: usize = 1;
     while (i < args.len) : (i += 1) {
         const arg = args[i];
         if (std.mem.eql(u8, arg, "-h") or std.mem.eql(u8, arg, "--help")) {
-            parsed.show_help = true;
+            printHelp();
+            return null;
+        } else if (std.mem.eql(u8, arg, "-t") or std.mem.eql(u8, arg, "--time")) {
+            parsed.measure_time = true;
             continue;
-        }
-
-        if (std.mem.eql(u8, arg, "-o") or std.mem.eql(u8, arg, "--output")) {
+        } else if (std.mem.eql(u8, arg, "-o") or std.mem.eql(u8, arg, "--output")) {
             i += 1;
             if (i >= args.len) {
                 eprintf("Missing value for {s}\n", .{arg});
@@ -86,9 +111,7 @@ fn parseArgs(args: []const []const u8) !CliArgs {
             }
             parsed.output_path = args[i];
             continue;
-        }
-
-        if (std.mem.eql(u8, arg, "-m") or std.mem.eql(u8, arg, "--mode")) {
+        } else if (std.mem.eql(u8, arg, "-m") or std.mem.eql(u8, arg, "--mode")) {
             i += 1;
             if (i >= args.len) {
                 eprintf("Missing value for {s}\n", .{arg});
@@ -105,22 +128,16 @@ fn parseArgs(args: []const []const u8) !CliArgs {
                 return error.InvalidMode;
             }
             continue;
-        }
-
-        if (std.mem.startsWith(u8, arg, "-")) {
+        } else if (std.mem.startsWith(u8, arg, "-")) {
             eprintf("Unknown argument: {s}\n", .{arg});
             return error.InvalidArgument;
-        }
-
-        if (parsed.input_path.len != 0) {
+        } else if (parsed.input_path.len != 0) {
             eprintf("Only one input file is supported. Got extra: {s}\n", .{arg});
             return error.InvalidArgument;
         }
 
         parsed.input_path = arg;
     }
-
-    if (parsed.show_help) return parsed;
 
     if (parsed.input_path.len == 0) {
         eprintf("Missing input brainfuck file path.\n", .{});
@@ -138,22 +155,34 @@ fn printHelp() void {
         \\  -h, --help            Show this help message
         \\  -m, --mode <mode>     Choose execution mode: interpret | jit (default: jit)
         \\  -o, --output <path>   Write compiled machine code to file
+        \\  -t, --time            Measure execution time
         \\
     , .{});
 }
 
-fn write_file(path: []const u8, data: []const u8) !void {
+fn write_file(io: std.Io, path: []const u8, data: []const u8) !void {
     if (std.fs.path.dirname(path)) |dir| {
         if (dir.len > 0) {
-            try std.fs.cwd().makePath(dir);
+            try std.Io.Dir.cwd().createDirPath(io, dir);
         }
     }
 
-    const file = if (std.fs.path.isAbsolute(path))
-        try std.fs.createFileAbsolute(path, .{ .truncate = true })
-    else
-        try std.fs.cwd().createFile(path, .{ .truncate = true });
-    defer file.close();
+    var file: std.Io.File = undefined;
 
-    try file.writeAll(data);
+    if (std.fs.path.isAbsolute(path)) {
+        if (std.Io.Dir.path.dirname(path)) |dir| {
+            try std.Io.Dir.createDirAbsolute(io, dir, .default_dir);
+        }
+
+        file = try std.Io.Dir.createFileAbsolute(io, path, .{ .truncate = true });
+    } else {
+        if (std.fs.path.dirname(path)) |dir| {
+            try std.Io.Dir.cwd().createDirPath(io, dir);
+        }
+
+        file = try std.Io.Dir.cwd().createFile(io, path, .{ .truncate = true });
+    }
+    defer file.close(io);
+
+    try file.writeStreamingAll(io, data);
 }

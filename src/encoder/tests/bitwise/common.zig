@@ -30,7 +30,7 @@ fn print_buffer(comptime prefix: []const u8, buff: []const u8) void {
 }
 
 fn fn_logic(comptime Dest: type, comptime Src: type) type {
-    return fn (writer: *std.io.Writer, dest: Dest, source: Src) EncodingError!usize;
+    return fn (writer: *std.Io.Writer, dest: Dest, source: Src) EncodingError!usize;
 }
 
 pub fn validate(
@@ -43,7 +43,7 @@ pub fn validate(
     source: Src,
 ) !void {
     var buffer: [16]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     const written = try tested(&writer, dest, source);
 

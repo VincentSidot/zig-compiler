@@ -13,7 +13,7 @@ const default_bin_path: []const u8 = "../temp/out.bin";
 const Tester = struct {
     path: []const u8,
 
-    const encoderFn = fn (writer: *std.io.Writer) EncodingError!void;
+    const encoderFn = fn (writer: *std.Io.Writer) EncodingError!void;
 
     // Generate a binary file with the provided encoding function.
     fn generate(self: *const Tester, enconding: *const encoderFn) !void {
@@ -141,7 +141,7 @@ pub fn main() !void {
 }
 
 // Here we define the instruction that we want to encode and test.
-fn inst_to_encode(writer: *std.io.Writer) EncodingError!void {
+fn inst_to_encode(writer: *std.Io.Writer) EncodingError!void {
     // Reproducer: baseIndex32 with no base/index currently takes modrm rm=101 path.
     _ = try mov.rm64_r64(
         writer,

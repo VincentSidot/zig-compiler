@@ -14,7 +14,7 @@ fn validate(
     comptime Src: type,
     comptime name: []const u8,
     comptime expected: []const u8,
-    tested: fn (writer: *std.io.Writer, dest: Dest, source: Src) EncodingError!usize,
+    tested: fn (writer: *std.Io.Writer, dest: Dest, source: Src) EncodingError!usize,
     dest: Dest,
     source: Src,
 ) !void {
@@ -30,14 +30,14 @@ test "LEA 32 bit memory forms" {
 
 test "LEA 32 bit invalid reg source" {
     var buffer: [8]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     try std.testing.expectError(EncodingError.InvalidOperand, lea.r32_m(&writer, .EAX, .{ .reg = .ECX }));
 }
 
 test "LEA 32 bit writer errors" {
     var buffer: [0]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     try std.testing.expectError(EncodingError.WriterError, lea.r32_m(&writer, .EAX, .{ .mem = .{ .ripRelative = 0x10 } }));
 }

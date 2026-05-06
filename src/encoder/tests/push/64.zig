@@ -16,7 +16,7 @@ fn validate(
     comptime Dest: type,
     comptime name: []const u8,
     comptime expected: []const u8,
-    tested: fn (writer: *std.io.Writer, dest: Dest) EncodingError!usize,
+    tested: fn (writer: *std.Io.Writer, dest: Dest) EncodingError!usize,
     dest: Dest,
 ) !void {
     _ = validate_calls.fetchAdd(1, .monotonic);
@@ -90,7 +90,7 @@ test "PUSH address-size override forms" {
 
 test "PUSH writer errors" {
     var buffer: [0]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     try std.testing.expectError(EncodingError.WriterError, push.r64(&writer, .RAX));
     try std.testing.expectError(EncodingError.WriterError, push.imm8(&writer, -1));

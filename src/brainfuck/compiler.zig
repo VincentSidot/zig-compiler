@@ -1,7 +1,7 @@
 const std = @import("std");
 const log = std.log;
 
-const Writer = std.io.Writer;
+const Writer = std.Io.Writer;
 
 const builtin = @import("builtin");
 
@@ -74,7 +74,8 @@ const extractBits = encoder.extractBits;
 
 fn compile_inner(interpreted: *BrainfuckInterpreter) ![]u8 {
     const allocator = interpreted.allocator;
-    var writer_alloc = std.io.Writer.Allocating.init(allocator);
+
+    var writer_alloc = std.Io.Writer.Allocating.init(allocator);
     errdefer writer_alloc.deinit();
 
     const writer = &writer_alloc.writer;
@@ -85,12 +86,7 @@ fn compile_inner(interpreted: *BrainfuckInterpreter) ![]u8 {
     defer loop_stack.deinit(allocator);
 
     const CallStackOp = packed struct {
-        const ValueType = @Type(
-            .{ .int = .{
-                .signedness = std.builtin.Signedness.unsigned,
-                .bits = @bitSizeOf(usize) - 1,
-            } },
-        );
+        const ValueType = @Int(std.builtin.Signedness.unsigned, @bitSizeOf(usize) - 1);
 
         kind: enum(u1) {
             PUTC,

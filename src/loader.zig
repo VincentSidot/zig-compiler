@@ -38,13 +38,14 @@ pub fn FunctionLoader(comptime F: type) type {
 }
 
 fn apply_protect(comptime F: type, data: []const u8) !FunctionLoader(F) {
-    const PROT = system.PROT;
-
     // Change the memory protection to allow execution
     const mprotect_result = system.mprotect(
         data.ptr,
         data.len,
-        PROT.EXEC | PROT.READ,
+        .{
+            .EXEC = true,
+            .READ = true,
+        },
     );
 
     if (mprotect_result != 0) {
@@ -65,8 +66,6 @@ fn apply_protect(comptime F: type, data: []const u8) !FunctionLoader(F) {
 }
 
 pub fn load_from_memory(comptime F: type, data: []const u8) !FunctionLoader(F) {
-    const PROT = system.PROT;
-
     log.debug("Loading function from memory: {d} bytes", .{data.len});
 
     const file_size: usize = data.len;
@@ -77,7 +76,10 @@ pub fn load_from_memory(comptime F: type, data: []const u8) !FunctionLoader(F) {
     const raw_buffer = system.mmap(
         null,
         file_size,
-        PROT.READ | PROT.WRITE,
+        .{
+            .READ = true,
+            .WRITE = true,
+        },
         .{ .TYPE = .PRIVATE, .ANONYMOUS = true },
         -1,
         0,

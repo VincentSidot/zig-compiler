@@ -6,7 +6,7 @@ Use the `tester.zig` helper zig function, modify `inst_to_encode` function to ma
 
 ```zig
 // Here we define the instruction that we want to encode and test.
-fn inst_to_encode(writer: *std.io.Writer) EncodingError!void {
+fn inst_to_encode(writer: *std.Io.Writer) EncodingError!void {
     const mov = encoder.mov;
     _ = try mov.rm32_imm32(writer, .{ .reg = .EDI }, 0x89AB_CDEF);
 }

@@ -21,7 +21,7 @@ fn print_buffer(comptime prefix: []const u8, buff: []const u8) void {
 }
 
 fn fn_call(comptime Dest: type) type {
-    return fn (writer: *std.io.Writer, dest: Dest) EncodingError!usize;
+    return fn (writer: *std.Io.Writer, dest: Dest) EncodingError!usize;
 }
 
 pub fn validate(
@@ -32,7 +32,7 @@ pub fn validate(
     dest: Dest,
 ) !void {
     var buffer: [16]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     const written = try tested(&writer, dest);
 
@@ -58,7 +58,7 @@ pub fn validate_rel32(
     disp: i32,
 ) !void {
     var buffer: [8]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     const written = try call.rel32(&writer, disp);
 

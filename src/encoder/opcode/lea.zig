@@ -21,7 +21,7 @@ const RegisterMemory64 = register.RegisterMemory_64;
 const RegisterMemory32 = register.RegisterMemory_32;
 const RegisterMemory16 = register.RegisterMemory_16;
 
-const Writer = std.io.Writer;
+const Writer = std.Io.Writer;
 const Register16_LegacyPrefix = 0x66;
 
 const LEA_OPCODE = struct {
@@ -49,7 +49,7 @@ fn encode(
         .reg => {
             return EncodingError.InvalidOperand;
         },
-        .mem => |_| {},
+        .mem => {},
     }
 
     if (is_16bit) {

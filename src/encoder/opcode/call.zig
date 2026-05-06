@@ -19,7 +19,7 @@ const emit_modrm_sib = register.emit_modrm_sib;
 const Register64 = register.RegisterIndex_64;
 const RegisterMemory64 = register.RegisterMemory_64;
 
-const Writer = std.io.Writer;
+const Writer = std.Io.Writer;
 
 const CALL_OPCODE = struct {
     const CALL_REL32: u8 = 0xE8; // call rel32

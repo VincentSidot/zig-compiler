@@ -14,7 +14,7 @@ fn validate(
     comptime Src: type,
     comptime name: []const u8,
     comptime expected: []const u8,
-    tested: fn (writer: *std.io.Writer, dest: Dest, source: Src) EncodingError!usize,
+    tested: fn (writer: *std.Io.Writer, dest: Dest, source: Src) EncodingError!usize,
     dest: Dest,
     source: Src,
 ) !void {
@@ -258,6 +258,6 @@ test "ADD 16 bit base-index32 memory" {
 
 test "ADD 16 bit writer errors" {
     var buffer: [0]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
     try std.testing.expectError(EncodingError.WriterError, add.r16_imm16(&writer, .AX, 0x1234));
 }

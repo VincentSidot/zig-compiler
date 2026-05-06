@@ -39,7 +39,7 @@ const SUB_OPCODE = struct {
     const SUB_RM64_IMM32: u8 = 0x81; // /5 + REX.W
 };
 
-const Writer = std.io.Writer;
+const Writer = std.Io.Writer;
 
 pub const rm8_r8 = factory_op(RegisterMemory8, Register8, SUB_OPCODE.SUB_RM8_R8);
 pub const r8_rm8 = factory_op(Register8, RegisterMemory8, SUB_OPCODE.SUB_R8_RM8);

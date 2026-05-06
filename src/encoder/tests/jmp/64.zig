@@ -15,7 +15,7 @@ fn validate(
     comptime Dest: type,
     comptime name: []const u8,
     comptime expected: []const u8,
-    tested: fn (writer: *std.io.Writer, dest: Dest) EncodingError!usize,
+    tested: fn (writer: *std.Io.Writer, dest: Dest) EncodingError!usize,
     dest: Dest,
 ) !void {
     _ = validate_calls.fetchAdd(1, .monotonic);
@@ -134,7 +134,7 @@ test "JMP address-size override forms" {
 
 test "JMP writer errors" {
     var buffer: [0]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     try std.testing.expectError(EncodingError.WriterError, jmp.rel8(&writer, -1));
     try std.testing.expectError(EncodingError.WriterError, jmp.r64(&writer, .RAX));

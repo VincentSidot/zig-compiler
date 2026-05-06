@@ -2,7 +2,7 @@ const std = @import("std");
 const enc_error = @import("error.zig");
 const helper = @import("helper.zig");
 
-const Writer = std.io.Writer;
+const Writer = std.Io.Writer;
 const EncodingError = enc_error.EncodingError;
 const RetKind = helper.RetKind;
 

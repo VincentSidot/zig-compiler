@@ -13,7 +13,7 @@ fn validate(
     comptime Dest: type,
     comptime name: []const u8,
     comptime expected: []const u8,
-    tested: fn (writer: *std.io.Writer, dest: Dest) EncodingError!usize,
+    tested: fn (writer: *std.Io.Writer, dest: Dest) EncodingError!usize,
     dest: Dest,
 ) !void {
     _ = validate_calls.fetchAdd(1, .monotonic);
@@ -21,8 +21,8 @@ fn validate(
 }
 
 test "POP r64 forms" {
-    try validate(RegisterIndex_64, "RAX", &.{ 0x58 }, pop.r64, .RAX);
-    try validate(RegisterIndex_64, "RCX", &.{ 0x59 }, pop.r64, .RCX);
+    try validate(RegisterIndex_64, "RAX", &.{0x58}, pop.r64, .RAX);
+    try validate(RegisterIndex_64, "RCX", &.{0x59}, pop.r64, .RCX);
     try validate(RegisterIndex_64, "R9", &.{ 0x41, 0x59 }, pop.r64, .R9);
     try validate(RegisterIndex_64, "R15", &.{ 0x41, 0x5F }, pop.r64, .R15);
 }
@@ -52,7 +52,7 @@ test "POP address-size override forms" {
 
 test "POP writer errors" {
     var buffer: [0]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
 
     try std.testing.expectError(EncodingError.WriterError, pop.r64(&writer, .RAX));
     try std.testing.expectError(EncodingError.WriterError, pop.rm64(&writer, .{ .reg = .RAX }));

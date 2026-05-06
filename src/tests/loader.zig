@@ -5,7 +5,7 @@ const encoder = @import("../encoder/lib.zig");
 fn buildFibBytecode(allocator: std.mem.Allocator) ![]u8 {
     const op = encoder.opcode;
 
-    var writer_alloc = std.io.Writer.Allocating.init(allocator);
+    var writer_alloc = std.Io.Writer.Allocating.init(allocator);
     errdefer writer_alloc.deinit();
 
     const writer = &writer_alloc.writer;

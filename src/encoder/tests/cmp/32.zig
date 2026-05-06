@@ -14,7 +14,7 @@ fn validate(
     comptime Src: type,
     comptime name: []const u8,
     comptime expected: []const u8,
-    tested: fn (writer: *std.io.Writer, dest: Dest, source: Src) EncodingError!usize,
+    tested: fn (writer: *std.Io.Writer, dest: Dest, source: Src) EncodingError!usize,
     dest: Dest,
     source: Src,
 ) !void {
@@ -108,6 +108,6 @@ test "CMP 32 bit base-index memory" {
 
 test "CMP 32 bit writer errors" {
     var buffer: [0]u8 = undefined;
-    var writer = std.io.Writer.fixed(&buffer);
+    var writer = std.Io.Writer.fixed(&buffer);
     try std.testing.expectError(EncodingError.WriterError, cmp.r32_rm32(&writer, .EAX, .{ .reg = .ECX }));
 }

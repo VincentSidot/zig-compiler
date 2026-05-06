@@ -52,7 +52,7 @@ const MOV_OPCODE = struct {
     const MOV_RM64_IMM64: u8 = 0xC7;
 };
 
-const Writer = std.io.Writer;
+const Writer = std.Io.Writer;
 
 pub const rm8_r8 = factory_op(
     RegisterMemory8,

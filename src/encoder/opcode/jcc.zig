@@ -9,7 +9,7 @@ const EncodingError = error_file.EncodingError;
 const helper_file = @import("../helper.zig");
 const extractBits = helper_file.extractBits;
 
-const Writer = std.io.Writer;
+const Writer = std.Io.Writer;
 
 pub const Condition = enum(u4) {
     o = 0x0,

@@ -34,7 +34,7 @@ const TEST_OPCODE = struct {
     const TEST_RM64_IMM32: u8 = 0xF7; // /0 + REX.W
 };
 
-const Writer = std.io.Writer;
+const Writer = std.Io.Writer;
 
 pub const rm8_r8 = factory_op(RegisterMemory8, Register8, TEST_OPCODE.TEST_RM8_R8);
 pub const rm16_r16 = factory_op(RegisterMemory16, Register16, TEST_OPCODE.TEST_RM16_R16);
