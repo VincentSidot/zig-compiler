@@ -103,15 +103,3 @@ pub fn validate_rel32(
         return error.InvalidEncodingData;
     }
 }
-
-test "JMP Summary" {
-    const jmp_64 = @import("64.zig");
-
-    const jmp_64_tests = jmp_64.validate_calls.load(.monotonic);
-    const jmp_total_tests = jmp_64_tests;
-
-    eprintf(
-        "JMP Summary: 64={d:03} total={d:03}\n",
-        .{ jmp_64_tests, jmp_total_tests },
-    );
-}

@@ -62,21 +62,3 @@ pub fn validate(
         return error.InvalidEncodingData;
     }
 }
-
-test "BITWISE Summary" {
-    const bitwise_8 = @import("8.zig");
-    const bitwise_16 = @import("16.zig");
-    const bitwise_32 = @import("32.zig");
-    const bitwise_64 = @import("64.zig");
-
-    const bitwise_8_tests = bitwise_8.validate_calls.load(.monotonic);
-    const bitwise_16_tests = bitwise_16.validate_calls.load(.monotonic);
-    const bitwise_32_tests = bitwise_32.validate_calls.load(.monotonic);
-    const bitwise_64_tests = bitwise_64.validate_calls.load(.monotonic);
-    const bitwise_total_tests = bitwise_8_tests + bitwise_16_tests + bitwise_32_tests + bitwise_64_tests;
-
-    eprintf(
-        "BITWISE Summary: 8={d:03} 16={d:03} 32={d:03} 64={d:03} total={d:03}\n",
-        .{ bitwise_8_tests, bitwise_16_tests, bitwise_32_tests, bitwise_64_tests, bitwise_total_tests },
-    );
-}

@@ -77,15 +77,3 @@ pub fn validate_rel32(
         return error.InvalidEncodingData;
     }
 }
-
-test "CALL Summary" {
-    const call_64 = @import("64.zig");
-
-    const call_64_tests = call_64.validate_calls.load(.monotonic);
-    const call_total_tests = call_64_tests;
-
-    eprintf(
-        "CALL Summary: 64={d:03} total={d:03}\n",
-        .{ call_64_tests, call_total_tests },
-    );
-}

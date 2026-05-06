@@ -53,9 +53,3 @@ pub fn validate(
         return error.InvalidEncodingData;
     }
 }
-
-test "TEST Summary" {
-    const test_8 = @import("8.zig");
-    const test_8_tests = test_8.validate_calls.load(.monotonic);
-    eprintf("TEST Summary: 8={d:03} total={d:03}\n", .{ test_8_tests, test_8_tests });
-}

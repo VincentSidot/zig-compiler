@@ -61,21 +61,3 @@ pub fn validate(
         return error.InvalidEncodingData;
     }
 }
-
-test "ADD Summary" {
-    const add_8 = @import("8.zig");
-    const add_16 = @import("16.zig");
-    const add_32 = @import("32.zig");
-    const add_64 = @import("64.zig");
-
-    const add_8_tests = add_8.validate_calls.load(.monotonic);
-    const add_16_tests = add_16.validate_calls.load(.monotonic);
-    const add_32_tests = add_32.validate_calls.load(.monotonic);
-    const add_64_tests = add_64.validate_calls.load(.monotonic);
-    const add_total_tests = add_8_tests + add_16_tests + add_32_tests + add_64_tests;
-
-    eprintf(
-        "ADD Summary: 8={d:03} 16={d:03} 32={d:03} 64={d:03} total={d:03}\n",
-        .{ add_8_tests, add_16_tests, add_32_tests, add_64_tests, add_total_tests },
-    );
-}

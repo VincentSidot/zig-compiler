@@ -60,21 +60,3 @@ pub fn validate(
         return error.InvalidEncodingData;
     }
 }
-
-test "SUB Summary" {
-    const sub_8 = @import("8.zig");
-    const sub_16 = @import("16.zig");
-    const sub_32 = @import("32.zig");
-    const sub_64 = @import("64.zig");
-
-    const sub_8_tests = sub_8.validate_calls.load(.monotonic);
-    const sub_16_tests = sub_16.validate_calls.load(.monotonic);
-    const sub_32_tests = sub_32.validate_calls.load(.monotonic);
-    const sub_64_tests = sub_64.validate_calls.load(.monotonic);
-    const sub_total_tests = sub_8_tests + sub_16_tests + sub_32_tests + sub_64_tests;
-
-    eprintf(
-        "SUB Summary: 8={d:03} 16={d:03} 32={d:03} 64={d:03} total={d:03}\n",
-        .{ sub_8_tests, sub_16_tests, sub_32_tests, sub_64_tests, sub_total_tests },
-    );
-}

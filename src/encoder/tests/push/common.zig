@@ -129,15 +129,3 @@ pub fn validate_imm32(
         return error.InvalidEncodingData;
     }
 }
-
-test "PUSH Summary" {
-    const push_64 = @import("64.zig");
-
-    const push_64_tests = push_64.validate_calls.load(.monotonic);
-    const push_total_tests = push_64_tests;
-
-    eprintf(
-        "PUSH Summary: 64={d:03} total={d:03}\n",
-        .{ push_64_tests, push_total_tests },
-    );
-}

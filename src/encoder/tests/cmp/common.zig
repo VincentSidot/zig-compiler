@@ -60,21 +60,3 @@ pub fn validate(
         return error.InvalidEncodingData;
     }
 }
-
-test "CMP Summary" {
-    const cmp_8 = @import("8.zig");
-    const cmp_16 = @import("16.zig");
-    const cmp_32 = @import("32.zig");
-    const cmp_64 = @import("64.zig");
-
-    const cmp_8_tests = cmp_8.validate_calls.load(.monotonic);
-    const cmp_16_tests = cmp_16.validate_calls.load(.monotonic);
-    const cmp_32_tests = cmp_32.validate_calls.load(.monotonic);
-    const cmp_64_tests = cmp_64.validate_calls.load(.monotonic);
-    const cmp_total_tests = cmp_8_tests + cmp_16_tests + cmp_32_tests + cmp_64_tests;
-
-    eprintf(
-        "CMP Summary: 8={d:03} 16={d:03} 32={d:03} 64={d:03} total={d:03}\n",
-        .{ cmp_8_tests, cmp_16_tests, cmp_32_tests, cmp_64_tests, cmp_total_tests },
-    );
-}

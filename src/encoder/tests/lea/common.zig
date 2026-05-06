@@ -58,19 +58,3 @@ pub fn validate(
         return error.InvalidEncodingData;
     }
 }
-
-test "LEA Summary" {
-    const lea_16 = @import("16.zig");
-    const lea_32 = @import("32.zig");
-    const lea_64 = @import("64.zig");
-
-    const lea_16_tests = lea_16.validate_calls.load(.monotonic);
-    const lea_32_tests = lea_32.validate_calls.load(.monotonic);
-    const lea_64_tests = lea_64.validate_calls.load(.monotonic);
-    const lea_total_tests = lea_16_tests + lea_32_tests + lea_64_tests;
-
-    eprintf(
-        "LEA Summary: 16={d:03} 32={d:03} 64={d:03} total={d:03}\n",
-        .{ lea_16_tests, lea_32_tests, lea_64_tests, lea_total_tests },
-    );
-}

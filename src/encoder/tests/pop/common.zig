@@ -51,15 +51,3 @@ pub fn validate(
         return error.InvalidEncodingData;
     }
 }
-
-test "POP Summary" {
-    const pop_64 = @import("64.zig");
-
-    const pop_64_tests = pop_64.validate_calls.load(.monotonic);
-    const pop_total_tests = pop_64_tests;
-
-    eprintf(
-        "POP Summary: 64={d:03} total={d:03}\n",
-        .{ pop_64_tests, pop_total_tests },
-    );
-}

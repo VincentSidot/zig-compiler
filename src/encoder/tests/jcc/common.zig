@@ -125,15 +125,3 @@ pub fn validate_rel32_cond(
         return error.InvalidEncodingData;
     }
 }
-
-test "JCC Summary" {
-    const jcc_rel = @import("rel.zig");
-
-    const jcc_rel_tests = jcc_rel.validate_calls.load(.monotonic);
-    const jcc_total_tests = jcc_rel_tests;
-
-    eprintf(
-        "JCC Summary: tests={d:03} total={d:03}\n",
-        .{ jcc_rel_tests, jcc_total_tests },
-    );
-}
