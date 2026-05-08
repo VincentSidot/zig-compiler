@@ -9,7 +9,11 @@ const opcode = @import("../../opcode.zig");
 pub const push = opcode.push;
 pub const EncodingError = lib_file.EncodingError;
 
+pub const RegisterIndex_16 = lib_file.RegisterIndex_16;
+pub const RegisterIndex_32 = lib_file.RegisterIndex_32;
 pub const RegisterIndex_64 = lib_file.RegisterIndex_64;
+pub const RegisterMemory_16 = lib_file.RegisterMemory_16;
+pub const RegisterMemory_32 = lib_file.RegisterMemory_32;
 pub const RegisterMemory_64 = lib_file.RegisterMemory_64;
 
 fn print_buffer(comptime prefix: []const u8, buff: []const u8) void {

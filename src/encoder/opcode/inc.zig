@@ -1,5 +1,5 @@
-//! Encoder module for POP instruction forms.
-//! This is built from https://www.felixcloutier.com/x86/pop
+//! Encoder module for INC instruction forms.
+//! This is built from https://www.felixcloutier.com/x86/inc
 
 const std = @import("std");
 
@@ -8,50 +8,43 @@ const EncodingError = error_file.EncodingError;
 
 const factory_file = @import("../factory.zig");
 const factory_single = factory_file.factory_single;
+const factory_single_rex_w = factory_file.factory_single_rex_w;
 
 const register = @import("../reg.zig");
 
-const Register16 = register.RegisterIndex_16;
-const Register32 = register.RegisterIndex_32;
-const Register64 = register.RegisterIndex_64;
+const RegisterMemory8 = register.RegisterMemory_8;
 const RegisterMemory16 = register.RegisterMemory_16;
 const RegisterMemory32 = register.RegisterMemory_32;
 const RegisterMemory64 = register.RegisterMemory_64;
 
 const OP = struct {
-    const REG: u8 = 0x58; // +rd
-    const RM: u8 = 0x8F; // /0
+    const RM8: u8 = 0xFE; // /0
+    const RM16_32_64: u8 = 0xFF; // /0
 };
 
-/// pop r16/r32/r64
-pub const r16 = factory_single(
-    Register16,
-    0, // Unused
-    OP.REG,
-);
-pub const r32 = factory_single(
-    Register32,
-    0, // Unused
-    OP.REG,
-);
-pub const r64 = factory_single(
-    Register64,
-    0, // Unused
-    OP.REG,
+// inc r/m8 r/m16 r/m32 r/m64
+
+pub const rm8 = factory_single(
+    RegisterMemory8,
+    0b000, // /0
+    OP.RM8,
 );
 
 pub const rm16 = factory_single(
     RegisterMemory16,
     0b000, // /0
-    OP.RM,
+    OP.RM16_32_64,
 );
+
 pub const rm32 = factory_single(
     RegisterMemory32,
     0b000, // /0
-    OP.RM,
+    OP.RM16_32_64,
 );
-pub const rm64 = factory_single(
+
+pub const rm64 = factory_single_rex_w(
     RegisterMemory64,
     0b000, // /0
-    OP.RM,
+    OP.RM16_32_64,
+    true,
 );

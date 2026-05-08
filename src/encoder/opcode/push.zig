@@ -10,22 +10,26 @@ const helper_file = @import("../helper.zig");
 const extractBits = helper_file.extractBits;
 
 const factory_file = @import("../factory.zig");
+const factory_single = factory_file.factory_single;
 const rex_bytes = factory_file.rex_bytes;
 
 const register = @import("../reg.zig");
 const BIT32_ADDRESSING_PREFIX = register.BIT32_ADDRESSING_PREFIX;
 const emit_modrm_sib = register.emit_modrm_sib;
 
+const Register16 = register.RegisterIndex_16;
+const Register32 = register.RegisterIndex_32;
 const Register64 = register.RegisterIndex_64;
+const RegisterMemory16 = register.RegisterMemory_16;
+const RegisterMemory32 = register.RegisterMemory_32;
 const RegisterMemory64 = register.RegisterMemory_64;
 
 const Writer = std.Io.Writer;
 const Register16_LegacyPrefix: u8 = 0x66;
 
 const PUSH_OPCODE = struct {
-    const PUSH_R64_BASE: u8 = 0x50; // +rd
-    const PUSH_RM64: u8 = 0xFF; // /6
-    const PUSH_GROUP_DIGIT: u3 = 0b110;
+    const PUSH_REG: u8 = 0x50; // +rd
+    const PUSH_M: u8 = 0xFF; // /6
 
     const PUSH_IMM8: u8 = 0x6A;
     const PUSH_IMM32: u8 = 0x68;
@@ -67,51 +71,38 @@ fn emit_imm(
     return written;
 }
 
-/// push r64
-pub fn r64(writer: *Writer, dest: Register64) EncodingError!usize {
-    var written: usize = 0;
+/// push r16/r32/r64
+pub const r16 = factory_single(
+    Register16,
+    0, // Unused
+    PUSH_OPCODE.PUSH_REG,
+);
+pub const r32 = factory_single(
+    Register32,
+    0, // Unused
+    PUSH_OPCODE.PUSH_REG,
+);
+pub const r64 = factory_single(
+    Register64,
+    0, // Unused
+    PUSH_OPCODE.PUSH_REG,
+);
 
-    if (dest.is_extended()) {
-        const rex = rex_bytes(false, false, false, true);
-        written += 1;
-        try write_byte(writer, rex);
-    }
-
-    const opcode = PUSH_OPCODE.PUSH_R64_BASE | (dest.reg_low3() & 0x7);
-    written += 1;
-    try write_byte(writer, opcode);
-
-    return written;
-}
-
-/// push r/m64 (FF /6)
-pub fn rm64(writer: *Writer, dest: RegisterMemory64) EncodingError!usize {
-    var written: usize = 0;
-
-    if (dest.is_memory32()) {
-        written += 1;
-        try write_byte(writer, BIT32_ADDRESSING_PREFIX);
-    }
-
-    if (dest.rex_b() or dest.rex_x()) {
-        const rex = rex_bytes(false, false, dest.rex_x(), dest.rex_b());
-        written += 1;
-        try write_byte(writer, rex);
-    }
-
-    written += 1;
-    try write_byte(writer, PUSH_OPCODE.PUSH_RM64);
-
-    written += try emit_modrm_sib(
-        u3,
-        RegisterMemory64,
-        writer,
-        PUSH_OPCODE.PUSH_GROUP_DIGIT,
-        dest,
-    );
-
-    return written;
-}
+pub const rm16 = factory_single(
+    RegisterMemory16,
+    0b110, // /6
+    PUSH_OPCODE.PUSH_M,
+);
+pub const rm32 = factory_single(
+    RegisterMemory32,
+    0b110, // /6
+    PUSH_OPCODE.PUSH_M,
+);
+pub const rm64 = factory_single(
+    RegisterMemory64,
+    0b110, // /6
+    PUSH_OPCODE.PUSH_M,
+);
 
 /// push imm8 (sign-extended by CPU)
 pub fn imm8(writer: *Writer, value: i8) EncodingError!usize {

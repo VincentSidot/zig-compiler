@@ -44,6 +44,8 @@ test {
     const lea_testing = @import("tests/lea.zig");
     const bitwise_testing = @import("tests/bitwise.zig");
     const test_testing = @import("tests/test.zig");
+    const inc_testing = @import("tests/inc.zig");
+    const dec_testing = @import("tests/dec.zig");
     const reg_testing = @import("tests/reg.zig");
 
     std.testing.refAllDecls(mov_testing);
@@ -58,5 +60,7 @@ test {
     std.testing.refAllDecls(lea_testing);
     std.testing.refAllDecls(bitwise_testing);
     std.testing.refAllDecls(test_testing);
+    std.testing.refAllDecls(inc_testing);
+    std.testing.refAllDecls(dec_testing);
     std.testing.refAllDecls(reg_testing);
 }

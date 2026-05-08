@@ -23,6 +23,8 @@ pub const bitxor = @import("opcode/bitxor.zig");
 pub const test_op = @import("opcode/test.zig");
 pub const @"test" = test_op;
 pub const mov = @import("opcode/mov.zig");
+pub const inc = @import("opcode/inc.zig");
+pub const dec = @import("opcode/dec.zig");
 
 pub fn syscall(writer: *Writer) EncodingError!usize {
     const SYSCALL_OPCODE = [2]u8{
