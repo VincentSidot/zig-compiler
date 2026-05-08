@@ -9,8 +9,6 @@ const RegisterMemory_16 = common.RegisterMemory_16;
 const RegisterMemory_32 = common.RegisterMemory_32;
 const RegisterMemory_64 = common.RegisterMemory_64;
 
-pub var validate_calls = std.atomic.Value(usize).init(0);
-
 fn validate(
     comptime Dest: type,
     comptime name: []const u8,
@@ -18,7 +16,6 @@ fn validate(
     tested: fn (writer: *std.Io.Writer, dest: Dest) EncodingError!usize,
     dest: Dest,
 ) !void {
-    _ = validate_calls.fetchAdd(1, .monotonic);
     try validate_impl(Dest, name, expected, tested, dest);
 }
 

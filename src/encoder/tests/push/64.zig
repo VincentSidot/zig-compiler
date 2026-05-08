@@ -14,8 +14,6 @@ const RegisterMemory_16 = common.RegisterMemory_16;
 const RegisterMemory_32 = common.RegisterMemory_32;
 const RegisterMemory_64 = common.RegisterMemory_64;
 
-pub var validate_calls = std.atomic.Value(usize).init(0);
-
 fn validate(
     comptime Dest: type,
     comptime name: []const u8,
@@ -23,7 +21,6 @@ fn validate(
     tested: fn (writer: *std.Io.Writer, dest: Dest) EncodingError!usize,
     dest: Dest,
 ) !void {
-    _ = validate_calls.fetchAdd(1, .monotonic);
     try validate_impl(Dest, name, expected, tested, dest);
 }
 
@@ -32,7 +29,6 @@ fn validate_imm8(
     comptime expected: []const u8,
     value: i8,
 ) !void {
-    _ = validate_calls.fetchAdd(1, .monotonic);
     try validate_imm8_impl(name, expected, value);
 }
 
@@ -41,7 +37,6 @@ fn validate_imm32(
     comptime expected: []const u8,
     value: u32,
 ) !void {
-    _ = validate_calls.fetchAdd(1, .monotonic);
     try validate_imm32_impl(name, expected, value);
 }
 
@@ -50,7 +45,6 @@ fn validate_imm16(
     comptime expected: []const u8,
     value: u16,
 ) !void {
-    _ = validate_calls.fetchAdd(1, .monotonic);
     try validate_imm16_impl(name, expected, value);
 }
 

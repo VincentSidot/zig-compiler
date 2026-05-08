@@ -8,8 +8,6 @@ const EncodingError = common.EncodingError;
 const RegisterIndex_64 = common.RegisterIndex_64;
 const RegisterMemory_64 = common.RegisterMemory_64;
 
-pub var validate_calls = std.atomic.Value(usize).init(0);
-
 fn validate(
     comptime Dest: type,
     comptime name: []const u8,
@@ -17,7 +15,6 @@ fn validate(
     tested: fn (writer: *std.Io.Writer, dest: Dest) EncodingError!usize,
     dest: Dest,
 ) !void {
-    _ = validate_calls.fetchAdd(1, .monotonic);
     try validate_impl(Dest, name, expected, tested, dest);
 }
 
@@ -26,7 +23,6 @@ fn validate_rel32(
     comptime expected: []const u8,
     disp: i32,
 ) !void {
-    _ = validate_calls.fetchAdd(1, .monotonic);
     try validate_rel32_impl(name, expected, disp);
 }
 
@@ -36,8 +32,6 @@ test "CALL rel32 forms" {
 }
 
 test "CALL patch_rel32 patches forward/backward targets" {
-    _ = validate_calls.fetchAdd(1, .monotonic);
-
     var buffer = [_]u8{
         0xE8, 0x00, 0x00, 0x00, 0x00, // call at 0
         0x90, 0x90, 0x90, 0x90, 0x90, // filler
@@ -52,15 +46,11 @@ test "CALL patch_rel32 patches forward/backward targets" {
 }
 
 test "CALL patch_rel32 returns InvalidPatchAddress" {
-    _ = validate_calls.fetchAdd(1, .monotonic);
-
     var buffer = [_]u8{ 0xE8, 0x00, 0x00, 0x00 };
     try std.testing.expectError(EncodingError.InvalidPatchAddress, call.patch_rel32(buffer[0..], 0, 0));
 }
 
 test "CALL patch_rel32 returns InvalidDisplacement" {
-    _ = validate_calls.fetchAdd(1, .monotonic);
-
     var buffer = [_]u8{ 0xE8, 0x00, 0x00, 0x00, 0x00 };
     const too_far_target = @as(usize, @intCast(@as(i64, std.math.maxInt(i32)) + 6));
     try std.testing.expectError(

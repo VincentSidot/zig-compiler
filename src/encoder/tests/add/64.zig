@@ -7,8 +7,6 @@ const EncodingError = common.EncodingError;
 const RegisterIndex_64 = common.RegisterIndex_64;
 const RegisterMemory_64 = common.RegisterMemory_64;
 
-pub var validate_calls = std.atomic.Value(usize).init(0);
-
 fn validate(
     comptime Dest: type,
     comptime Src: type,
@@ -18,7 +16,6 @@ fn validate(
     dest: Dest,
     source: Src,
 ) !void {
-    _ = validate_calls.fetchAdd(1, .monotonic);
     try validate_impl(Dest, Src, name, expected, tested, dest, source);
 }
 

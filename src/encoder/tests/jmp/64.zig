@@ -9,8 +9,6 @@ const EncodingError = common.EncodingError;
 const RegisterIndex_64 = common.RegisterIndex_64;
 const RegisterMemory_64 = common.RegisterMemory_64;
 
-pub var validate_calls = std.atomic.Value(usize).init(0);
-
 fn validate(
     comptime Dest: type,
     comptime name: []const u8,
@@ -18,7 +16,6 @@ fn validate(
     tested: fn (writer: *std.Io.Writer, dest: Dest) EncodingError!usize,
     dest: Dest,
 ) !void {
-    _ = validate_calls.fetchAdd(1, .monotonic);
     try validate_impl(Dest, name, expected, tested, dest);
 }
 
@@ -27,7 +24,6 @@ fn validate_rel8(
     comptime expected: []const u8,
     disp: i8,
 ) !void {
-    _ = validate_calls.fetchAdd(1, .monotonic);
     try validate_rel8_impl(name, expected, disp);
 }
 
@@ -36,7 +32,6 @@ fn validate_rel32(
     comptime expected: []const u8,
     disp: i32,
 ) !void {
-    _ = validate_calls.fetchAdd(1, .monotonic);
     try validate_rel32_impl(name, expected, disp);
 }
 
@@ -49,8 +44,6 @@ test "JMP rel forms" {
 }
 
 test "JMP patch_rel8 patches forward/backward targets" {
-    _ = validate_calls.fetchAdd(1, .monotonic);
-
     var buffer = [_]u8{
         0xEB, 0x00, // jmp rel8 at 0
         0x90, 0x90, 0x90, 0x90, // filler
@@ -65,8 +58,6 @@ test "JMP patch_rel8 patches forward/backward targets" {
 }
 
 test "JMP patch_rel32 patches forward/backward targets" {
-    _ = validate_calls.fetchAdd(1, .monotonic);
-
     var buffer = [_]u8{
         0xE9, 0x00, 0x00, 0x00, 0x00, // jmp rel32 at 0
         0x90, 0x90, 0x90, // filler
@@ -81,8 +72,6 @@ test "JMP patch_rel32 patches forward/backward targets" {
 }
 
 test "JMP patch_rel8 returns errors" {
-    _ = validate_calls.fetchAdd(1, .monotonic);
-
     var short = [_]u8{0xEB};
     try std.testing.expectError(EncodingError.InvalidPatchAddress, jmp.patch_rel8(short[0..], 0, 0));
 
@@ -91,8 +80,6 @@ test "JMP patch_rel8 returns errors" {
 }
 
 test "JMP patch_rel32 returns errors" {
-    _ = validate_calls.fetchAdd(1, .monotonic);
-
     var short = [_]u8{ 0xE9, 0x00, 0x00, 0x00 };
     try std.testing.expectError(EncodingError.InvalidPatchAddress, jmp.patch_rel32(short[0..], 0, 0));
 
