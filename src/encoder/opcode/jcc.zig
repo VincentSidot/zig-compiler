@@ -12,21 +12,37 @@ const extractBits = helper_file.extractBits;
 const Writer = std.Io.Writer;
 
 pub const Condition = enum(u4) {
+    /// Overflow
     o = 0x0,
+    /// No overflow
     no = 0x1,
+    /// Below (unsigned)
     b = 0x2, // c, nae
+    /// Above or equal (unsigned)
     ae = 0x3, // nb, nc
+    /// Equal
     e = 0x4, // z
+    /// Not equal
     ne = 0x5, // nz
+    /// Below or equal (unsigned)
     be = 0x6, // na
+    /// Above (unsigned)
     a = 0x7, // nbe
+    /// Sign
     s = 0x8,
+    /// Not sign
     ns = 0x9,
+    /// Parity even
     p = 0xA, // pe
+    /// Parity odd
     np = 0xB, // po
+    /// Less (signed)
     l = 0xC, // nge
+    /// Greater or equal (signed)
     ge = 0xD, // nl
+    /// Less or equal (signed)
     le = 0xE, // ng
+    /// Greater (signed)
     g = 0xF, // nle
 };
 
@@ -107,42 +123,4 @@ pub fn patch_rel32(buffer: []u8, op_addr: usize, patch_value: usize) EncodingErr
     const disp: i32 = std.math.cast(i32, delta) orelse return EncodingError.InvalidDisplacement;
     const bytes = extractBits(i32, disp);
     @memcpy(buffer[op_addr + 2 .. op_addr + 6], bytes[0..]);
-}
-
-pub fn jz_rel8(writer: *Writer, disp: i8) EncodingError!usize {
-    return rel8(writer, .e, disp);
-}
-pub fn jnz_rel8(writer: *Writer, disp: i8) EncodingError!usize {
-    return rel8(writer, .ne, disp);
-}
-pub fn jl_rel8(writer: *Writer, disp: i8) EncodingError!usize {
-    return rel8(writer, .l, disp);
-}
-pub fn jg_rel8(writer: *Writer, disp: i8) EncodingError!usize {
-    return rel8(writer, .g, disp);
-}
-pub fn jb_rel8(writer: *Writer, disp: i8) EncodingError!usize {
-    return rel8(writer, .b, disp);
-}
-pub fn ja_rel8(writer: *Writer, disp: i8) EncodingError!usize {
-    return rel8(writer, .a, disp);
-}
-
-pub fn jz_rel32(writer: *Writer, disp: i32) EncodingError!usize {
-    return rel32(writer, .e, disp);
-}
-pub fn jnz_rel32(writer: *Writer, disp: i32) EncodingError!usize {
-    return rel32(writer, .ne, disp);
-}
-pub fn jl_rel32(writer: *Writer, disp: i32) EncodingError!usize {
-    return rel32(writer, .l, disp);
-}
-pub fn jg_rel32(writer: *Writer, disp: i32) EncodingError!usize {
-    return rel32(writer, .g, disp);
-}
-pub fn jle_rel32(writer: *Writer, disp: i32) EncodingError!usize {
-    return rel32(writer, .le, disp);
-}
-pub fn jge_rel32(writer: *Writer, disp: i32) EncodingError!usize {
-    return rel32(writer, .ge, disp);
 }

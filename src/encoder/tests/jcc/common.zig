@@ -21,13 +21,13 @@ fn print_buffer(comptime prefix: []const u8, buff: []const u8) void {
 pub fn validate_rel8(
     comptime name: []const u8,
     comptime expected: []const u8,
-    tested: fn (writer: *std.Io.Writer, disp: i8) EncodingError!usize,
+    condition: Condition,
     disp: i8,
 ) !void {
     var buffer: [8]u8 = undefined;
     var writer = std.Io.Writer.fixed(&buffer);
 
-    const written = try tested(&writer, disp);
+    const written = try jcc.rel8(&writer, condition, disp);
 
     if (written != expected.len) {
         eprintf("\n[JCC rel8 validation failed] {s}\n", .{name});
@@ -48,13 +48,13 @@ pub fn validate_rel8(
 pub fn validate_rel32(
     comptime name: []const u8,
     comptime expected: []const u8,
-    tested: fn (writer: *std.Io.Writer, disp: i32) EncodingError!usize,
+    condition: Condition,
     disp: i32,
 ) !void {
     var buffer: [16]u8 = undefined;
     var writer = std.Io.Writer.fixed(&buffer);
 
-    const written = try tested(&writer, disp);
+    const written = try jcc.rel32(&writer, condition, disp);
 
     if (written != expected.len) {
         eprintf("\n[JCC rel32 validation failed] {s}\n", .{name});
