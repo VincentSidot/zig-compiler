@@ -8,9 +8,13 @@ const EncodingError = error_file.EncodingError;
 
 const helper_file = @import("../helper.zig");
 const extractBits = helper_file.extractBits;
+const patch = helper_file.patch;
+const OFFSETS = helper_file.OFFSETS;
 
 const factory_file = @import("../factory.zig");
 const rex_bytes = factory_file.rex_bytes;
+const write_byte = factory_file.write_byte;
+const write_bytes = factory_file.write_bytes;
 
 const register = @import("../reg.zig");
 const BIT32_ADDRESSING_PREFIX = register.BIT32_ADDRESSING_PREFIX;
@@ -29,19 +33,15 @@ const CALL_OPCODE = struct {
 
 /// call rel32
 /// disp is relative to the next instruction.
-pub fn rel32(writer: *Writer, disp: i32) EncodingError!usize {
+pub fn rel32(writer: ?*Writer, disp: i32) EncodingError!usize {
     var written: usize = 0;
 
     written += 1;
-    writer.writeByte(CALL_OPCODE.CALL_REL32) catch {
-        return EncodingError.WriterError;
-    };
+    try write_byte(writer, CALL_OPCODE.CALL_REL32);
 
     const disp32 = extractBits(i32, disp);
     written += 4;
-    writer.writeAll(&disp32) catch {
-        return EncodingError.WriterError;
-    };
+    try write_bytes(writer, &disp32);
 
     return written;
 }
@@ -49,40 +49,26 @@ pub fn rel32(writer: *Writer, disp: i32) EncodingError!usize {
 /// Backpatch a `call rel32` encoded at `op_addr`.
 /// `patch_value` is the absolute target address (within `buffer`) to call.
 pub fn patch_rel32(buffer: []u8, op_addr: usize, patch_value: usize) EncodingError!void {
-    if (op_addr + 5 > buffer.len) {
-        return EncodingError.InvalidPatchAddress;
-    }
-
-    const next_ip = op_addr + 5;
-    const delta: i64 = @as(i64, @intCast(patch_value)) - @as(i64, @intCast(next_ip));
-    const disp: i32 = std.math.cast(i32, delta) orelse return EncodingError.InvalidDisplacement;
-    const bytes = extractBits(i32, disp);
-    @memcpy(buffer[op_addr + 1 .. op_addr + 5], bytes[0..]);
+    try patch(i32, OFFSETS.O1_JMP_REL32, OFFSETS.O2_JMP_REL32, buffer, op_addr, patch_value);
 }
 
 /// call r/m64 (FF /2)
-pub fn rm64(writer: *Writer, dest: RegisterMemory64) EncodingError!usize {
+pub fn rm64(writer: ?*Writer, dest: RegisterMemory64) EncodingError!usize {
     var written: usize = 0;
 
     if (dest.is_memory32()) {
         written += 1;
-        writer.writeByte(BIT32_ADDRESSING_PREFIX) catch {
-            return EncodingError.WriterError;
-        };
+        try write_byte(writer, BIT32_ADDRESSING_PREFIX);
     }
 
     if (dest.rex_b() or dest.rex_x()) {
         const rex = rex_bytes(false, false, dest.rex_x(), dest.rex_b());
         written += 1;
-        writer.writeByte(rex) catch {
-            return EncodingError.WriterError;
-        };
+        try write_byte(writer, rex);
     }
 
     written += 1;
-    writer.writeByte(CALL_OPCODE.CALL_RM64) catch {
-        return EncodingError.WriterError;
-    };
+    try write_byte(writer, CALL_OPCODE.CALL_RM64);
 
     written += try emit_modrm_sib(
         u3,
@@ -96,6 +82,6 @@ pub fn rm64(writer: *Writer, dest: RegisterMemory64) EncodingError!usize {
 }
 
 /// call r64
-pub fn r64(writer: *Writer, dest: Register64) EncodingError!usize {
+pub fn r64(writer: ?*Writer, dest: Register64) EncodingError!usize {
     return rm64(writer, RegisterMemory64{ .reg = dest });
 }

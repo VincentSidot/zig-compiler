@@ -8,6 +8,7 @@ const EncodingError = error_file.EncodingError;
 
 const factory_file = @import("../factory.zig");
 const rex_bytes = factory_file.rex_bytes;
+const write_byte = factory_file.write_byte;
 
 const register = @import("../reg.zig");
 const BIT32_ADDRESSING_PREFIX = register.BIT32_ADDRESSING_PREFIX;
@@ -28,16 +29,10 @@ const LEA_OPCODE = struct {
     const LEA_R_M: u8 = 0x8D;
 };
 
-inline fn write_byte(writer: *Writer, byte: u8) EncodingError!void {
-    writer.writeByte(byte) catch {
-        return EncodingError.WriterError;
-    };
-}
-
 fn encode(
     comptime Reg: type,
     comptime Mem: type,
-    writer: *Writer,
+    writer: ?*Writer,
     dest: Reg,
     source: Mem,
     comptime is_16bit: bool,
@@ -83,16 +78,16 @@ fn encode(
 }
 
 /// lea r16, m
-pub fn r16_m(writer: *Writer, dest: Register16, source: RegisterMemory16) EncodingError!usize {
+pub fn r16_m(writer: ?*Writer, dest: Register16, source: RegisterMemory16) EncodingError!usize {
     return encode(Register16, RegisterMemory16, writer, dest, source, true, false);
 }
 
 /// lea r32, m
-pub fn r32_m(writer: *Writer, dest: Register32, source: RegisterMemory32) EncodingError!usize {
+pub fn r32_m(writer: ?*Writer, dest: Register32, source: RegisterMemory32) EncodingError!usize {
     return encode(Register32, RegisterMemory32, writer, dest, source, false, false);
 }
 
 /// lea r64, m
-pub fn r64_m(writer: *Writer, dest: Register64, source: RegisterMemory64) EncodingError!usize {
+pub fn r64_m(writer: ?*Writer, dest: Register64, source: RegisterMemory64) EncodingError!usize {
     return encode(Register64, RegisterMemory64, writer, dest, source, false, true);
 }

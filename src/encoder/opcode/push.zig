@@ -12,6 +12,8 @@ const extractBits = helper_file.extractBits;
 const factory_file = @import("../factory.zig");
 const factory_single = factory_file.factory_single;
 const rex_bytes = factory_file.rex_bytes;
+const write_byte = factory_file.write_byte;
+const write_bytes = factory_file.write_bytes;
 
 const register = @import("../reg.zig");
 const BIT32_ADDRESSING_PREFIX = register.BIT32_ADDRESSING_PREFIX;
@@ -35,21 +37,9 @@ const PUSH_OPCODE = struct {
     const PUSH_IMM32: u8 = 0x68;
 };
 
-inline fn write_byte(writer: *Writer, byte: u8) EncodingError!void {
-    writer.writeByte(byte) catch {
-        return EncodingError.WriterError;
-    };
-}
-
-inline fn write_bytes(writer: *Writer, bytes: []const u8) EncodingError!void {
-    writer.writeAll(bytes) catch {
-        return EncodingError.WriterError;
-    };
-}
-
 fn emit_imm(
     comptime T: type,
-    writer: *Writer,
+    writer: ?*Writer,
     opcode: u8,
     operand_prefix_66: bool,
     value: T,
@@ -105,16 +95,16 @@ pub const rm64 = factory_single(
 );
 
 /// push imm8 (sign-extended by CPU)
-pub fn imm8(writer: *Writer, value: i8) EncodingError!usize {
+pub fn imm8(writer: ?*Writer, value: i8) EncodingError!usize {
     return emit_imm(i8, writer, PUSH_OPCODE.PUSH_IMM8, false, value);
 }
 
 /// push imm16
-pub fn imm16(writer: *Writer, value: u16) EncodingError!usize {
+pub fn imm16(writer: ?*Writer, value: u16) EncodingError!usize {
     return emit_imm(u16, writer, PUSH_OPCODE.PUSH_IMM32, true, value);
 }
 
 /// push imm32 (sign-extended by CPU in long mode)
-pub fn imm32(writer: *Writer, value: u32) EncodingError!usize {
+pub fn imm32(writer: ?*Writer, value: u32) EncodingError!usize {
     return emit_imm(u32, writer, PUSH_OPCODE.PUSH_IMM32, false, value);
 }

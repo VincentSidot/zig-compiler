@@ -15,4 +15,11 @@ use64
 
 ; mov ebx, [1234h]
 
-mov [r8d], rax
+pop rax
+pop rbx
+pop ax
+
+inc rax
+inc eax
+inc ax
+inc al

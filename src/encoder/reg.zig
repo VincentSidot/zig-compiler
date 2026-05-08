@@ -1,6 +1,10 @@
 const std = @import("std");
 const Writer = std.Io.Writer;
 
+const factory_file = @import("factory.zig");
+const write_byte = factory_file.write_byte;
+const write_bytes = factory_file.write_bytes;
+
 const error_file = @import("error.zig");
 const EncodingError = error_file.EncodingError;
 
@@ -539,7 +543,7 @@ pub fn emit_modrm_sib(
     /// the reg field.
     comptime Reg: type,
     comptime Mem: type,
-    writer: *Writer,
+    writer: ?*Writer,
     /// In case of Reg being u3, pass the raw ModR/M reg field value (group digit).
     /// Otherwise pass an index register value.
     reg: Reg,
@@ -601,7 +605,7 @@ pub fn emit_modrm_sib(
 fn emit_modrm_sib_reg_only(
     comptime Reg: type,
     comptime Mem: type,
-    writer: *Writer,
+    writer: ?*Writer,
     reg: Reg,
     rm_reg: Mem,
 ) EncodingError!usize {
@@ -618,15 +622,13 @@ fn emit_modrm_sib_reg_only(
     // Encode ModR/M byte
     const modrm_byte = modrm(mod, reg3, rm3);
 
-    writer.writeByte(modrm_byte) catch {
-        return EncodingError.WriterError;
-    };
+    try write_byte(writer, modrm_byte);
     return 1; // Number of bytes written
 }
 
 fn emit_modrm_sib_rip_relative(
     comptime Reg: type,
-    writer: *Writer,
+    writer: ?*Writer,
     reg: Reg,
     disp: RipRelativeMemory,
 ) EncodingError!usize {
@@ -643,13 +645,9 @@ fn emit_modrm_sib_rip_relative(
 
     // Write ModR/M and disp32
     written += 1;
-    writer.writeByte(modrm_byte) catch {
-        return EncodingError.WriterError;
-    };
+    try write_byte(writer, modrm_byte);
     written += @sizeOf(RipRelativeMemory);
-    writer.writeAll(&disp32) catch {
-        return EncodingError.WriterError;
-    };
+    try write_bytes(writer, &disp32);
 
     return written;
 }
@@ -657,7 +655,7 @@ fn emit_modrm_sib_rip_relative(
 fn emit_modrm_sib_base_index(
     comptime Reg: type,
     comptime Mem: type,
-    writer: *Writer,
+    writer: ?*Writer,
     reg: Reg,
     mem: Mem,
 ) EncodingError!usize {
@@ -705,9 +703,7 @@ fn emit_modrm_sib_base_index(
 
     // Write ModR/M byte
     written += 1;
-    writer.writeByte(modrm_byte) catch {
-        return EncodingError.WriterError;
-    };
+    try write_byte(writer, modrm_byte);
 
     // Write SIB byte if needed
     if (need_sib) {
@@ -718,25 +714,19 @@ fn emit_modrm_sib_base_index(
         const sib_byte = sib(scale_bits, index_bits, base_bits);
 
         written += 1;
-        writer.writeByte(sib_byte) catch {
-            return EncodingError.WriterError;
-        };
+        try write_byte(writer, sib_byte);
     }
 
     // Emit displacement bytes.
     if (force_disp32 or mod == DISP32) {
         const disp32: [4]u8 = extractBits(i32, mem.disp);
         written += 4;
-        writer.writeAll(&disp32) catch {
-            return EncodingError.WriterError;
-        };
+        try write_bytes(writer, &disp32);
     } else if (mod == DISP8) {
         const disp8: i8 = @intCast(mem.disp);
         const disp8_bits: [1]u8 = extractBits(i8, disp8);
         written += 1;
-        writer.writeAll(&disp8_bits) catch {
-            return EncodingError.WriterError;
-        };
+        try write_bytes(writer, &disp8_bits);
     }
 
     return written;

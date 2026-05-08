@@ -47,17 +47,27 @@ pub fn rex_bytes(w: bool, r: bool, x: bool, b: bool) u8 {
     return v;
 }
 
-inline fn write_byte(writer: *Writer, byte: u8) EncodingError!void {
-    writer.writeByte(byte) catch {
-        return EncodingError.WriterError;
-    };
+pub inline fn write_byte(maybe_writer: ?*Writer, byte: u8) EncodingError!void {
+    if (maybe_writer) |writer| {
+        writer.writeByte(byte) catch {
+            return EncodingError.WriterError;
+        };
+    }
+}
+
+pub inline fn write_bytes(maybe_writer: ?*Writer, bytes: []const u8) EncodingError!void {
+    if (maybe_writer) |writer| {
+        writer.writeAll(bytes) catch {
+            return EncodingError.WriterError;
+        };
+    }
 }
 
 pub fn factory_op(
     comptime Dst: type,
     comptime Src: type,
     comptime opcode: u8,
-) fn (writer: *Writer, dest: Dst, source: Src) EncodingError!usize {
+) fn (writer: ?*Writer, dest: Dst, source: Src) EncodingError!usize {
     const dest_is_rm = comptime is_memory_register(Dst);
 
     const Reg = comptime if (dest_is_rm) Src else Dst;
@@ -69,7 +79,7 @@ pub fn factory_op(
     const is_64bit = Reg == Register64;
 
     const factory = struct {
-        fn _inner(writer: *Writer, dest: Dst, source: Src) EncodingError!usize {
+        fn _inner(writer: ?*Writer, dest: Dst, source: Src) EncodingError!usize {
             var written: usize = 0;
 
             // 8-bit high registers are not encodable with any REX prefix.
@@ -94,16 +104,12 @@ pub fn factory_op(
 
             if (is_16bit) {
                 written += 1;
-                writer.writeByte(Register16_LegacyPrefix) catch {
-                    return EncodingError.WriterError;
-                };
+                try write_byte(writer, Register16_LegacyPrefix);
             }
 
             if (is_32bit_mem) {
                 written += 1;
-                writer.writeByte(BIT32_ADDRESSING_PREFIX) catch {
-                    return EncodingError.WriterError;
-                };
+                try write_byte(writer, BIT32_ADDRESSING_PREFIX);
             }
 
             if (source.need_rex() or dest.need_rex()) {
@@ -115,15 +121,11 @@ pub fn factory_op(
                 );
 
                 written += 1;
-                writer.writeByte(rex) catch {
-                    return EncodingError.WriterError;
-                };
+                try write_byte(writer, rex);
             }
 
             written += 1;
-            writer.writeByte(opcode) catch {
-                return EncodingError.WriterError;
-            };
+            try write_byte(writer, opcode);
 
             written += try emit_modrm_sib(
                 Reg,
@@ -144,7 +146,7 @@ pub fn factory_imm(
     comptime Dest: type,
     comptime Imm: type,
     comptime config: ImmediateConfig,
-) fn (writer: *Writer, dest: Dest, source: Imm) EncodingError!usize {
+) fn (writer: ?*Writer, dest: Dest, source: Imm) EncodingError!usize {
     const dest_is_rm = comptime is_memory_register(Dest);
 
     const is_16bit = comptime blk: {
@@ -164,22 +166,18 @@ pub fn factory_imm(
     };
 
     const factory = struct {
-        fn _inner(writer: *Writer, dest: Dest, source: Imm) EncodingError!usize {
+        fn _inner(writer: ?*Writer, dest: Dest, source: Imm) EncodingError!usize {
             var written: usize = 0;
             const is_32bit_mem = if (dest_is_rm) dest.is_memory32() else false;
 
             if (is_16bit) {
                 written += 1;
-                writer.writeByte(Register16_LegacyPrefix) catch {
-                    return EncodingError.WriterError;
-                };
+                try write_byte(writer, Register16_LegacyPrefix);
             }
 
             if (is_32bit_mem) {
                 written += 1;
-                writer.writeByte(BIT32_ADDRESSING_PREFIX) catch {
-                    return EncodingError.WriterError;
-                };
+                try write_byte(writer, BIT32_ADDRESSING_PREFIX);
             }
 
             if (dest.need_rex() or (dest_is_rm and is_64bit)) {
@@ -194,9 +192,7 @@ pub fn factory_imm(
                 );
 
                 written += 1;
-                writer.writeByte(rex) catch {
-                    return EncodingError.WriterError;
-                };
+                try write_byte(writer, rex);
             }
 
             switch (config.mode) {
@@ -206,9 +202,7 @@ pub fn factory_imm(
                     }
 
                     written += 1;
-                    writer.writeByte(config.opcode) catch {
-                        return EncodingError.WriterError;
-                    };
+                    try write_byte(writer, config.opcode);
 
                     written += try emit_modrm_sib(
                         u3,
@@ -225,17 +219,13 @@ pub fn factory_imm(
 
                     const opcode = config.opcode | (dest.reg_low3() & 0x7);
                     written += 1;
-                    writer.writeByte(opcode) catch {
-                        return EncodingError.WriterError;
-                    };
+                    try write_byte(writer, opcode);
                 },
             }
 
             written += @sizeOf(Imm);
             const bytes = extractBits(Imm, source);
-            writer.writeAll(&bytes) catch {
-                return EncodingError.WriterError;
-            };
+            try write_bytes(writer, &bytes);
 
             return written;
         }
@@ -249,7 +239,7 @@ pub fn factory_single(
     // Single operand instructions (unused for plain register)
     comptime inst: u3,
     comptime opcode: u8,
-) fn (writer: *Writer, dest: Dst) EncodingError!usize {
+) fn (writer: ?*Writer, dest: Dst) EncodingError!usize {
     return factory_single_rex_w(Dst, inst, opcode, false);
 }
 
@@ -259,7 +249,7 @@ pub fn factory_single_rex_w(
     comptime inst: u3,
     comptime opcode: u8,
     comptime rex_w: bool,
-) fn (writer: *Writer, dest: Dst) EncodingError!usize {
+) fn (writer: ?*Writer, dest: Dst) EncodingError!usize {
     const dest_is_rm = comptime is_memory_register(Dst);
     const Reg = comptime if (dest_is_rm) fetch_index_register(Dst) else Dst;
     const is_16bit = Reg == Register16;
@@ -267,7 +257,7 @@ pub fn factory_single_rex_w(
 
     if (dest_is_rm) {
         const factory = struct {
-            fn _inner(writer: *Writer, dest: Dst) EncodingError!usize {
+            fn _inner(writer: ?*Writer, dest: Dst) EncodingError!usize {
                 var written: usize = 0;
 
                 if (is_16bit) {
@@ -304,7 +294,7 @@ pub fn factory_single_rex_w(
         return factory._inner;
     } else {
         const factory = struct {
-            fn _inner(writer: *Writer, dest: Dst) EncodingError!usize {
+            fn _inner(writer: ?*Writer, dest: Dst) EncodingError!usize {
                 var written: usize = 0;
 
                 if (is_16bit) {

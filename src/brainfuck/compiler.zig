@@ -179,7 +179,7 @@ fn compile_inner(interpreted: *BrainfuckInterpreter) ![]u8 {
 
                 const loop_start_addr = written;
                 // Placeholder will be backpatched later.
-                written += try op.jcc.jz_rel32(writer, 0);
+                written += try op.jcc.rel32(writer, .e, 0);
                 // Push the position of the jump instruction to the stack for
                 // backpatching later.
                 try loop_stack.append(allocator, loop_start_addr);
@@ -202,7 +202,7 @@ fn compile_inner(interpreted: *BrainfuckInterpreter) ![]u8 {
                 const loop_end_jnz_addr = written;
 
                 // Emit placeholder backward branch at ']': jnz back to loop body.
-                written += try op.jcc.jnz_rel32(writer, 0);
+                written += try op.jcc.rel32(writer, .ne, 0);
 
                 const buffer = writer.buffer;
                 // Patch the ']' jnz to jump back to the loop body.

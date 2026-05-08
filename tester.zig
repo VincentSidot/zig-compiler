@@ -6,7 +6,6 @@ const eprintf = helper.eprintf;
 
 const encoder = @import("src/encoder/lib.zig");
 const EncodingError = encoder.EncodingError;
-const mov = encoder.mov;
 
 const default_bin_path: []const u8 = "../temp/out.bin";
 
@@ -16,8 +15,8 @@ const Tester = struct {
     const encoderFn = fn (writer: *std.Io.Writer) EncodingError!void;
 
     // Generate a binary file with the provided encoding function.
-    fn generate(self: *const Tester, enconding: *const encoderFn) !void {
-        const cwd = std.fs.cwd();
+    fn generate(self: *const Tester, io: std.Io, enconding: *const encoderFn) !void {
+        const cwd = std.Io.Dir.cwd();
         const path = self.path;
 
         // Extract the directory part from the path.
@@ -25,14 +24,14 @@ const Tester = struct {
             // No directory part, so we can skip this step.
             return;
         };
-        try cwd.makePath(dirPath);
+        try std.Io.Dir.createDirPath(cwd, io, dirPath);
 
-        const file = try cwd.createFile(path, .{ .truncate = true });
-        defer file.close();
+        const file = try std.Io.Dir.createFile(cwd, io, path, .{ .truncate = true });
+        defer file.close(io);
 
         var buffer: [1024]u8 = undefined;
 
-        var writer_interface = file.writer(&buffer);
+        var writer_interface = file.writer(io, &buffer);
 
         var writer = &writer_interface.interface;
         defer {
@@ -46,21 +45,21 @@ const Tester = struct {
 
     fn handle_termination(resp: std.process.Child.Term) !void {
         switch (resp) {
-            .Exited => |code| {
+            .exited => |code| {
                 if (code != 0) {
                     eprintf("objdump exited with code: {}\n", .{code});
                     return error.InvalidExitCode;
                 }
             },
-            .Signal => |sig| {
+            .signal => |sig| {
                 eprintf("Killed by signal: {}\n", .{sig});
                 return error.KilledBySignal;
             },
-            .Stopped => |sig| {
+            .stopped => |sig| {
                 eprintf("Stopped by signal: {}\n", .{sig});
                 return error.StoppedBySignal;
             },
-            .Unknown => {
+            .unknown => {
                 eprintf("Unknown termination\n", .{});
                 return error.UnknownTermination;
             },
@@ -68,7 +67,7 @@ const Tester = struct {
     }
 
     // Run
-    fn dump(self: *const Tester) !void {
+    fn dump(self: *const Tester, io: std.Io) !void {
         const allocator = std.heap.smp_allocator;
 
         const argv = [_][]const u8{
@@ -80,16 +79,17 @@ const Tester = struct {
             self.path,
         };
 
-        var child = std.process.Child.init(&argv, allocator);
-        child.stdout_behavior = .Pipe;
-        child.stderr_behavior = .Inherit; // Inherit stderr to see any errors from objdump.
+        // var child = std.process.Child.init(&argv, allocator);
+        var child = try std.process.spawn(io, .{
+            .argv = &argv,
+            .stdout = .pipe,
+            .stderr = .inherit,
+        });
 
         var child_has_been_waited = false;
-
-        try child.spawn();
         errdefer {
             if (!child_has_been_waited) {
-                if (child.wait()) |resp| {
+                if (child.wait(io)) |resp| {
                     _ = Tester.handle_termination(resp) catch |err| {
                         eprintf("Error handling child termination: {}\n", .{err});
                     };
@@ -104,7 +104,8 @@ const Tester = struct {
             return error.CaptureStdoutFailed;
         };
 
-        const stdout_data = try child_stdout.readToEndAlloc(allocator, 1024 * 1024); // 1MB buffer size
+        var file_reader = child_stdout.reader(io, &.{});
+        const stdout_data = try file_reader.interface.allocRemaining(allocator, .limited(1024 * 1024));
         defer allocator.free(stdout_data);
 
         // Find out addr of '<.data>:' in the objdump output.
@@ -118,59 +119,62 @@ const Tester = struct {
         const data_section_skip = data_section_str.len + 1;
 
         // Print the captured stdout from objdump.
-        const parent_stdout = std.fs.File.stdout();
-        parent_stdout.writeAll(stdout_data[data_section_index + data_section_skip ..]) catch |err| {
+        const parent_stdout = std.Io.File.stdout();
+        parent_stdout.writeStreamingAll(io, stdout_data[data_section_index + data_section_skip ..]) catch |err| {
             eprintf("Failed to write objdump output to stdout: {}\n", .{err});
         };
 
         child_has_been_waited = true;
-        const response = try child.wait();
+        const response = try child.wait(io);
         try Tester.handle_termination(response);
     }
 };
 
 const Disassembler = struct {};
 
-pub fn main() !void {
+pub fn main(init: std.process.Init) !void {
     const inst: Tester = .{
         .path = default_bin_path,
     };
 
-    try inst.generate(inst_to_encode);
-    try inst.dump();
+    try inst.generate(init.io, inst_to_encode);
+    try inst.dump(init.io);
 }
 
 // Here we define the instruction that we want to encode and test.
 fn inst_to_encode(writer: *std.Io.Writer) EncodingError!void {
-    // Reproducer: baseIndex32 with no base/index currently takes modrm rm=101 path.
-    _ = try mov.rm64_r64(
-        writer,
-        .{ .mem = .{ .baseIndex32 = .{
-            .base = null,
-            .index = null,
-            .disp = 0x1234,
-        } } },
-        .RAX,
-    );
-    _ = try mov.r64_rm64(
-        writer,
-        .R11,
-        .{ .mem = .{ .baseIndex32 = .{
-            .base = null,
-            .index = null,
-            .disp = 0x1234,
-        } } },
-    );
-    _ = try mov.rm64_imm32(
-        writer,
-        .{ .mem = .{ .baseIndex32 = .{
-            .base = null,
-            .index = null,
-            .disp = 0x1234,
-        } } },
-        0x1122_3344,
-    );
+    const pop = encoder.opcode.pop;
 
-    // Control: explicit RIP-relative form.
-    _ = try mov.rm64_r64(writer, .{ .mem = .{ .ripRelative = 0x1234 } }, .RAX);
+    _ = try pop.r16(writer, .R9W);
+    _ = try pop.r32(writer, .R9D);
+    _ = try pop.r64(writer, .R9);
+
+    _ = try pop.rm16(writer, .{ .reg = .R9W });
+    _ = try pop.rm32(writer, .{ .reg = .R9D });
+    _ = try pop.rm64(writer, .{ .reg = .R9 });
+
+    _ = try pop.rm16(
+        writer,
+        .{ .mem = .{ .baseIndex32 = .{
+            .base = null,
+            .index = null,
+            .disp = 0x1234,
+        } } },
+    );
+    _ = try pop.rm32(
+        writer,
+        .{ .mem = .{ .baseIndex32 = .{
+            .base = null,
+            .index = null,
+            .disp = 0x1234,
+        } } },
+    );
+    _ = try pop.rm64(
+        writer,
+        .{ .mem = .{ .baseIndex32 = .{
+            .base = null,
+            .index = null,
+            .disp = 0x1234,
+        } } },
+    );
 }

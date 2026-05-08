@@ -2,6 +2,10 @@ const std = @import("std");
 const enc_error = @import("error.zig");
 const helper = @import("helper.zig");
 
+const factory_file = @import("factory.zig");
+const write_byte = factory_file.write_byte;
+const write_bytes = factory_file.write_bytes;
+
 const Writer = std.Io.Writer;
 const EncodingError = enc_error.EncodingError;
 const RetKind = helper.RetKind;
@@ -26,21 +30,19 @@ pub const mov = @import("opcode/mov.zig");
 pub const inc = @import("opcode/inc.zig");
 pub const dec = @import("opcode/dec.zig");
 
-pub fn syscall(writer: *Writer) EncodingError!usize {
+pub fn syscall(writer: ?*Writer) EncodingError!usize {
     const SYSCALL_OPCODE = [2]u8{
         0x0F,
         0x05,
     };
 
     const written: usize = 2; // syscall number for write
-    writer.writeAll(&SYSCALL_OPCODE) catch {
-        return EncodingError.WriterError;
-    };
+    try write_bytes(writer, &SYSCALL_OPCODE);
 
     return written;
 }
 
-pub fn ret(writer: *Writer, kind: RetKind) EncodingError!usize {
+pub fn ret(writer: ?*Writer, kind: RetKind) EncodingError!usize {
     const RET_OPCODE_NEAR: u8 = 0xC3;
     const RET_OPCODE_FAR: u8 = 0xCB;
 
@@ -53,9 +55,7 @@ pub fn ret(writer: *Writer, kind: RetKind) EncodingError!usize {
     }
 
     const written: usize = 1; // syscall number for write
-    writer.writeByte(opcode) catch {
-        return EncodingError.WriterError;
-    };
+    try write_byte(writer, opcode);
 
     return written;
 }

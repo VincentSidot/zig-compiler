@@ -16,7 +16,7 @@ fn buildFibBytecode(allocator: std.mem.Allocator) ![]u8 {
     // if (n <= 1) goto ret_n
     written += try op.cmp.r64_imm32(writer, .RCX, 1);
     const ret_n_jle_addr = written;
-    written += try op.jcc.jle_rel32(writer, 0);
+    written += try op.jcc.rel32(writer, .le, 0);
 
     // a = 0 (rax), b = 1 (rdx)
     written += try op.mov.r64_imm64_auto(writer, .RAX, 0);
@@ -38,7 +38,7 @@ fn buildFibBytecode(allocator: std.mem.Allocator) ![]u8 {
     // while (n > 1) loop
     written += try op.cmp.r64_imm32(writer, .RCX, 1);
     const loop_jg_addr = written;
-    written += try op.jcc.jg_rel32(writer, 0);
+    written += try op.jcc.rel32(writer, .g, 0);
 
     // return b
     written += try op.mov.r64_r64(writer, .RAX, .RDX);
