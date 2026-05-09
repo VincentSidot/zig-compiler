@@ -35,6 +35,9 @@ pub fn compile(interpreted: *BrainfuckInterpreter) !BrainFuckCompiled {
     // Use the same allocator as the interpreter
     const allocator = interpreted.allocator;
 
+    var engine = Engine.init(allocator);
+    defer engine.deinit();
+
     // Compile the Brainfuck code into bytecode
     //
     // In this implementation, we will expect following:
@@ -44,8 +47,14 @@ pub fn compile(interpreted: *BrainfuckInterpreter) !BrainFuckCompiled {
     // - The bytecode will be a sequence of x86-64 machine code instructions
     // - The bytecode will be executed as a function with the signature:
     // `fn (mem: []u8) callconv(.c) void`
-    // const bytecode = try compile_inner(interpreted);
-    const bytecode = try compile_inner_engine(interpreted);
+    try compile_with_engine(
+        allocator,
+        interpreted.program,
+        &engine,
+    );
+    try engine.finalize();
+
+    const bytecode = try engine.takeBytes();
     errdefer allocator.free(bytecode);
 
     const program = try loader.load_from_memory(FnType, bytecode);
@@ -79,12 +88,11 @@ const op = encoder.opcode;
 const reg = encoder.register;
 const extractBits = encoder.extractBits;
 
-fn compile_inner_engine(interpreted: *BrainfuckInterpreter) ![]u8 {
-    const allocator = interpreted.allocator;
-
-    var engine = Engine.init(allocator);
-    defer engine.deinit();
-
+pub fn compile_with_engine(
+    allocator: std.mem.Allocator,
+    program: []const BrainfuckInterpreter.Lexer,
+    engine: *Engine,
+) !void {
     const _putc = try engine.label();
     const PUTC: Engine.CallTarget = .{ .label = _putc };
 
@@ -106,11 +114,12 @@ fn compile_inner_engine(interpreted: *BrainfuckInterpreter) ![]u8 {
     const Arg = Engine.Arg;
 
     // Generate the code.
-
     engine.push(TAPE_REGISTER);
+
+    // TAPE is passed as the first argument in rdi.
     engine.mov(TAPE_REGISTER, .rdi);
 
-    for (interpreted.program) |code| {
+    for (program) |code| {
         switch (code.kind) {
             .add => |disp| {
                 if (builtin.mode == .Debug) {
@@ -177,7 +186,7 @@ fn compile_inner_engine(interpreted: *BrainfuckInterpreter) ![]u8 {
 
     try sys_tape_arg3_engine(
         TAPE_REGISTER,
-        &engine,
+        engine,
         _putc,
         SYS_write,
         STDOUT_FD,
@@ -185,15 +194,12 @@ fn compile_inner_engine(interpreted: *BrainfuckInterpreter) ![]u8 {
     );
     try sys_tape_arg3_engine(
         TAPE_REGISTER,
-        &engine,
+        engine,
         _getc,
         SYS_read,
         STDIN_FD,
         1,
     );
-
-    try engine.finalize();
-    return try engine.takeBytes();
 }
 
 fn sys_tape_arg3_engine(

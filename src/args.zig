@@ -9,7 +9,7 @@ const printf = helper.printf;
 const eprintf = helper.eprintf;
 
 pub const Args = struct {
-    pub const Mode = enum { interpret, jit };
+    pub const Mode = enum { interpret, jit, elf };
 
     input_path: []const u8,
     output_path: ?[]const u8 = null,
@@ -72,6 +72,8 @@ fn parseArgs(args: []const []const u8, allocator: Allocator) !?Args {
                 parsed.mode = .interpret;
             } else if (std.mem.eql(u8, mode_arg, "jit")) {
                 parsed.mode = .jit;
+            } else if (std.mem.eql(u8, mode_arg, "elf")) {
+                parsed.mode = .elf;
             } else {
                 eprintf("Invalid mode: {s}. Expected one of: interpret, jit\n", .{mode_arg});
                 return error.InvalidMode;
@@ -94,6 +96,11 @@ fn parseArgs(args: []const []const u8, allocator: Allocator) !?Args {
         return error.MissingInputPath;
     }
 
+    if (parsed.mode == .elf and parsed.output_path == null) {
+        eprintf("Output path is required in elf mode.\n", .{});
+        return error.MissingOutputPath;
+    }
+
     return parsed;
 }
 
@@ -103,8 +110,8 @@ fn printHelp() void {
         \\
         \\Options:
         \\  -h, --help            Show this help message
-        \\  -m, --mode <mode>     Choose execution mode: interpret | jit (default: jit)
-        \\  -o, --output <path>   Write compiled machine code to file
+        \\  -m, --mode <mode>     Choose execution mode: interpret | jit (default: jit) | elf
+        \\  -o, --output <path>   Write compiled machine code to file (mandatory for elf mode)
         \\  -t, --time            Measure execution time
         \\
     , .{});

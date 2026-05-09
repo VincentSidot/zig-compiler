@@ -9,6 +9,8 @@ const logFunctionMake = helper.logFunctionMake;
 const printf = helper.printf;
 const eprintf = helper.eprintf;
 
+const Brainfuck = @import("../brainfuck/lib.zig");
+
 // Argument parsing logic
 const Args = @import("../args.zig").Args;
 
@@ -21,9 +23,11 @@ pub const std_options: std.Options = .{
 
 pub fn start(init: std.process.Init) !void {
     const allocator = std.heap.smp_allocator;
-    const brainfuck = @import("../brainfuck/lib.zig");
 
-    const args = try Args.init(init.minimal.args, allocator) orelse {
+    const args = Args.init(init.minimal.args, allocator) catch |err| {
+        eprintf("Error parsing arguments: {}\n", .{err});
+        return;
+    } orelse {
         // If the arguments are null
         return;
     };
@@ -41,7 +45,7 @@ pub fn start(init: std.process.Init) !void {
 
     printf("Loading brainfuck code from file: {s}\n", .{args.input_path});
 
-    var interpreter = try brainfuck.load_file(io, allocator, args.input_path);
+    var interpreter = try Brainfuck.load_file(io, allocator, args.input_path);
     defer interpreter.deinit();
 
     switch (args.mode) {
@@ -51,7 +55,7 @@ pub fn start(init: std.process.Init) !void {
         },
         .jit => {
             printf("Compiling brainfuck code to machine code...\n", .{});
-            const compiled = try brainfuck.compile(&interpreter);
+            const compiled = try Brainfuck.compile(&interpreter);
             defer compiled.deinit();
 
             if (args.output_path) |path| {
@@ -61,6 +65,15 @@ pub fn start(init: std.process.Init) !void {
 
             printf("Executing brainfuck code...\n", .{});
             try compiled.execute(&tape);
+        },
+        .elf => {
+            printf("Generating ELF executable from brainfuck code...\n", .{});
+            try generate_elf(
+                io,
+                allocator,
+                &interpreter,
+                args.output_path orelse unreachable,
+            );
         },
     }
 
@@ -107,4 +120,84 @@ fn write_file(io: std.Io, path: []const u8, data: []const u8) !void {
     defer file.close(io);
 
     try file.writeStreamingAll(io, data);
+}
+
+fn generate_elf(
+    io: std.Io,
+    allocator: std.mem.Allocator,
+    interpreter: *Brainfuck.BrainfuckInterpreter,
+    output_path: []const u8,
+) !void {
+    const AsmEngine = @import("../asm/engine.zig");
+    const ElfEngine = @import("../elf/engine.zig");
+
+    log.debug("Compile brainfuck code to machine code for ELF generation...\n", .{});
+    var asm_engine = AsmEngine.init(allocator);
+    defer asm_engine.deinit();
+
+    const TAPE_SIZE: usize = 30_000;
+    const TAPE_SYM = try asm_engine.symbol();
+
+    const ENTRY_LABEL = try asm_engine.label();
+
+    // Generate the code
+
+    asm_engine.mov(.rdi, .{
+        .sym = .{ .id = TAPE_SYM, .kind = .abs64 },
+    });
+    // Call the entry point of the compiled brainfuck code
+    asm_engine.call(.{ .label = ENTRY_LABEL });
+    // Now exit cleanly with syscall exit(0)
+    asm_engine.xor(.rdi, .rdi); // exit code 0
+    asm_engine.mov(.rax, .immediate(60)); // syscall number for exit
+    asm_engine.syscall();
+
+    try asm_engine.bind(ENTRY_LABEL);
+    try Brainfuck.compile_with_engine(
+        allocator,
+        interpreter.program,
+        &asm_engine,
+    );
+
+    try asm_engine.finalize();
+
+    const text_code = try asm_engine.takeBytes();
+    defer allocator.free(text_code);
+
+    var elf_engine = ElfEngine.init(allocator);
+    defer elf_engine.deinit();
+
+    const text = try elf_engine.segment(.{
+        .kind = .text,
+        .flags = .{ .read = true, .execute = true },
+    });
+
+    const data = try elf_engine.segment(.{
+        .kind = .data,
+        .flags = .{ .read = true, .write = true },
+    });
+
+    _ = try elf_engine.append(text, text_code);
+    _ = try elf_engine.reserveBss(data, TAPE_SIZE);
+
+    const data_virtual_address = try elf_engine.payloadVirtualAddress(data, 0);
+    const text_address = try elf_engine.payloadSlice(text, 0);
+
+    try asm_engine.patch(
+        text_address,
+        TAPE_SYM,
+        data_virtual_address,
+    );
+
+    try elf_engine.setEntry(text, 0);
+
+    var file = try std.Io.Dir.cwd().createFile(
+        io,
+        output_path,
+        .{ .truncate = true },
+    );
+    defer file.close(io);
+
+    const file_size = try elf_engine.finalizeToFile(io, file);
+    log.info("Generated ELF executable: {s} ({d} bytes)\n", .{ output_path, file_size });
 }

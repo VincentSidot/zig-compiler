@@ -114,3 +114,59 @@ test "elf engine resolves payload addresses" {
 
     try std.testing.expectEqual(phdr1.p_vaddr, addr);
 }
+
+test "elf engine reserves bss outside the file image" {
+    var engine = Engine.init(std.testing.allocator);
+    defer engine.deinit();
+
+    const text = try engine.segment(.{
+        .kind = .text,
+        .flags = .{ .read = true, .execute = true },
+    });
+    const data = try engine.segment(.{
+        .kind = .data,
+        .flags = .{ .read = true, .write = true },
+    });
+
+    _ = try engine.append(text, "code");
+    _ = try engine.append(data, "A");
+    _ = try engine.reserveBss(data, 30_000);
+    try engine.setEntry(text, 0);
+
+    const bytes = try engine.finalize();
+    defer std.testing.allocator.free(bytes);
+
+    const Elf64_Ehdr = std.elf.Elf64_Ehdr;
+    const Elf64_Phdr = std.elf.Elf64_Phdr;
+    const phdr1_start = @sizeOf(Elf64_Ehdr) + @sizeOf(Elf64_Phdr);
+    const phdr1 = std.mem.bytesAsValue(
+        Elf64_Phdr,
+        bytes[phdr1_start .. phdr1_start + @sizeOf(Elf64_Phdr)],
+    );
+
+    try std.testing.expectEqual(@as(u64, 1), phdr1.p_filesz);
+    try std.testing.expectEqual(@as(u64, 30_001), phdr1.p_memsz);
+}
+
+test "elf engine resolves virtual addresses inside bss" {
+    var engine = Engine.init(std.testing.allocator);
+    defer engine.deinit();
+
+    const text = try engine.segment(.{
+        .kind = .text,
+        .flags = .{ .read = true, .execute = true },
+    });
+    const data = try engine.segment(.{
+        .kind = .data,
+        .flags = .{ .read = true, .write = true },
+    });
+
+    _ = try engine.append(text, "code");
+    _ = try engine.reserveBss(data, 64);
+    try engine.setEntry(text, 0);
+
+    const base = try engine.payloadVirtualAddress(data, 0);
+    const tail = try engine.payloadVirtualAddress(data, 63);
+
+    try std.testing.expectEqual(base + 63, tail);
+}

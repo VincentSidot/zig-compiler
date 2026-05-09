@@ -14,3 +14,5 @@ pub const load_file = runner.load_file;
 pub const interpret = runner.interpret;
 /// Compiles a prepared Brainfuck program to native code.
 pub const compile = compiler.compile;
+/// Compiles a prepared Brainfuck program to native code using the inner engine.
+pub const compile_with_engine = compiler.compile_with_engine;

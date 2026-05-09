@@ -8,13 +8,13 @@ pub fn main2(init: std.process.Init) !void {
     try fib.run();
 }
 
-pub fn main3(init: std.process.Init) !void {
+pub fn main(init: std.process.Init) !void {
     const brainfuck = @import("apps/brainfuck.zig");
 
     try brainfuck.start(init);
 }
 
-pub fn main(init: std.process.Init) !void {
+pub fn main1(init: std.process.Init) !void {
     const elf = @import("apps/elf.zig");
 
     try elf.generate(init.io);
