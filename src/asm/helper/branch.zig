@@ -47,7 +47,7 @@ pub fn jmp(
         .label => |label| try rel32Label(writer, written, allocator, fixups, label, .jmp),
         .rel => |rel| written.* += try opcode.jmp.rel32(writer, rel),
         .reg => |reg| {
-            const r64 = reg.reg64() orelse {
+            const r64 = reg.as_reg64() orelse {
                 log.debug("jmp indirect register target must be a 64-bit register", .{});
                 return error.InvalidOperand;
             };
@@ -71,7 +71,7 @@ pub fn call(
         .label => |label| try rel32Label(writer, written, allocator, fixups, label, .call),
         .rel => |rel| written.* += try opcode.call.rel32(writer, rel),
         .reg => |reg| {
-            const r64 = reg.reg64() orelse {
+            const r64 = reg.as_reg64() orelse {
                 log.debug("call indirect register target must be a 64-bit register", .{});
                 return error.InvalidOperand;
             };
@@ -159,7 +159,7 @@ fn qwordMemory(mem: Memory) !encoder.RegisterMemory_64 {
         return error.InvalidOperand;
     }
 
-    return (try (Arg{ .mem = mem }).mem64()) orelse {
+    return (try (Arg{ .mem = mem }).as_mem64()) orelse {
         log.debug("failed to convert indirect branch memory target to encoder rm64 operand", .{});
         return error.InvalidOperand;
     };

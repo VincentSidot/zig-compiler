@@ -3,8 +3,8 @@
 const std = @import("std");
 
 const op_file = @import("op.zig");
-const BranchTarget = op_file.BranchTarget;
-const Condition = op_file.Condition;
+pub const BranchTarget = op_file.BranchTarget;
+pub const Condition = op_file.Condition;
 pub const Arg = op_file.Arg;
 const add_helper = @import("helper/add.zig");
 const bit_helper = @import("helper/bit.zig");
@@ -18,7 +18,7 @@ const sub_helper = @import("helper/sub.zig");
 const syscall_helper = @import("helper/syscall.zig");
 const xor_helper = @import("helper/xor.zig");
 
-const Engine = @This();
+pub const Engine = @This();
 
 allocator: std.mem.Allocator,
 writer_alloc: std.Io.Writer.Allocating,

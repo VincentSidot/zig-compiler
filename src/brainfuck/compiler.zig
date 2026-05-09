@@ -17,6 +17,8 @@ const helper = @import("../helper.zig");
 const setRawMode = helper.setRawMode;
 const restoreTerminal = helper.restoreTerminal;
 
+const Engine = @import("../asm/engine.zig").Engine;
+
 pub const BrainFuckCompiled = @This();
 
 const FnType = fn (mem: *u8) callconv(.c) void;
@@ -40,7 +42,8 @@ pub fn compile(interpreted: *BrainfuckInterpreter) !BrainFuckCompiled {
     // - The bytecode will be a sequence of x86-64 machine code instructions
     // - The bytecode will be executed as a function with the signature:
     // `fn (mem: []u8) callconv(.c) void`
-    const bytecode = try compile_inner(interpreted);
+    // const bytecode = try compile_inner(interpreted);
+    const bytecode = try compile_inner_engine(interpreted);
     errdefer allocator.free(bytecode);
 
     const program = try loader.load_from_memory(FnType, bytecode);
@@ -72,7 +75,155 @@ const op = encoder.opcode;
 const reg = encoder.register;
 const extractBits = encoder.extractBits;
 
-fn compile_inner(interpreted: *BrainfuckInterpreter) ![]u8 {
+fn compile_inner_engine(interpreted: *BrainfuckInterpreter) ![]u8 {
+    const allocator = interpreted.allocator;
+
+    var engine = Engine.init(allocator);
+    errdefer engine.deinit();
+
+    const _putc = try engine.label();
+    const PUTC: Engine.BranchTarget = .{ .label = _putc };
+
+    const _getc = try engine.label();
+    const GETC: Engine.BranchTarget = .{ .label = _getc };
+
+    const LoopStack = struct {
+        start: Engine.Label,
+        end: Engine.Label,
+    };
+
+    var loop_stack = std.ArrayList(LoopStack).empty;
+    defer loop_stack.deinit(allocator);
+
+    // R12
+    const TAPE_REGISTER: Engine.Arg = .r12;
+    // [R12]
+    const TAPE_REGISTIER_MEM: Engine.Arg = .{ .mem = .{ .reg = .r12, .size = .byte } };
+    const Arg = Engine.Arg;
+
+    // Generate the code.
+
+    try engine.push(TAPE_REGISTER);
+    try engine.mov(TAPE_REGISTER, .rdi);
+
+    for (interpreted.program) |code| {
+        switch (code.kind) {
+            .add => |disp| {
+                if (builtin.mode == .Debug) {
+                    if (disp < -128 or disp > 127) {
+                        log.warn(
+                            "Disp value {d} is out of range for 8-bit immediate. It will be truncated to fit.",
+                            .{disp},
+                        );
+                    }
+                }
+
+                const trunc: i8 = @truncate(disp);
+                const raw: u8 = @bitCast(trunc);
+
+                try engine.add(
+                    TAPE_REGISTIER_MEM,
+                    Arg.raw8(raw),
+                );
+            },
+            .move => |disp| {
+                try engine.add(TAPE_REGISTER, Arg.immediate(disp));
+            },
+            .input => {
+                try engine.call(GETC);
+            },
+            .output => {
+                try engine.call(PUTC);
+            },
+            .loop_start => {
+                const loop_start = try engine.label();
+                const loop_end = try engine.label();
+
+                try engine.bind(loop_start);
+                try engine.@"test"(TAPE_REGISTIER_MEM, Arg.raw8(0xFF));
+                try engine.jcc(.e, .{ .label = loop_end });
+
+                try loop_stack.append(allocator, .{
+                    .start = loop_start,
+                    .end = loop_end,
+                });
+            },
+            .loop_end => {
+                const loop = loop_stack.pop() orelse {
+                    return error.UnmatchedLoopEnd;
+                };
+
+                try engine.@"test"(TAPE_REGISTIER_MEM, Arg.raw8(0xFF));
+                try engine.jcc(.ne, .{ .label = loop.start });
+                try engine.bind(loop.end);
+            },
+        }
+    }
+
+    try engine.pop(TAPE_REGISTER);
+    try engine.ret();
+
+    // Define PUTC & GETC functions
+
+    const SYS_read = 0;
+    const SYS_write = 1;
+
+    const STDIN_FD: usize = 0;
+    const STDOUT_FD: usize = 1;
+
+    try sys_tape_arg3_engine(
+        TAPE_REGISTER,
+        &engine,
+        _putc,
+        SYS_write,
+        STDOUT_FD,
+        1,
+    );
+    try sys_tape_arg3_engine(
+        TAPE_REGISTER,
+        &engine,
+        _getc,
+        SYS_read,
+        STDIN_FD,
+        1,
+    );
+
+    const bytecode = try engine.finalize();
+
+    log.debug("Generated {d} bytes of machine code", .{bytecode.len});
+
+    return bytecode;
+}
+
+fn sys_tape_arg3_engine(
+    comptime TAPE_REG: Engine.Arg,
+    engine: *Engine,
+    label: Engine.Label,
+    sys: usize,
+    arg1: usize,
+    arg2: usize,
+) !void {
+
+    // Define label
+    try engine.bind(label);
+
+    try engine.push(TAPE_REG);
+
+    if (TAPE_REG != .rsi) {
+        try engine.mov(.rsi, TAPE_REG);
+    }
+
+    try engine.mov(.rdx, Engine.Arg.unsigned(arg2));
+    try engine.mov(.rdi, Engine.Arg.unsigned(arg1));
+    try engine.mov(.rax, Engine.Arg.unsigned(sys));
+    try engine.syscall();
+    try engine.pop(TAPE_REG);
+    try engine.ret();
+
+    return;
+}
+
+fn compile_inner_legacy(interpreted: *BrainfuckInterpreter) ![]u8 {
     const allocator = interpreted.allocator;
 
     var writer_alloc = std.Io.Writer.Allocating.init(allocator);
@@ -229,10 +380,10 @@ fn compile_inner(interpreted: *BrainfuckInterpreter) ![]u8 {
     const STDOUT_FD: usize = 1;
 
     const putc_offset = written;
-    written += try sys_tape_arg3(TAPE_REGISTER, writer, SYS_write, STDOUT_FD, 1);
+    written += try sys_tape_arg3_legacy(TAPE_REGISTER, writer, SYS_write, STDOUT_FD, 1);
 
     const getc_offset = written;
-    written += try sys_tape_arg3(TAPE_REGISTER, writer, SYS_read, STDIN_FD, 1);
+    written += try sys_tape_arg3_legacy(TAPE_REGISTER, writer, SYS_read, STDIN_FD, 1);
 
     // Backpatch the putc calls with the correct offset to the putc function.
     while (call_stack.pop()) |call_addr| {
@@ -253,7 +404,13 @@ fn compile_inner(interpreted: *BrainfuckInterpreter) ![]u8 {
     return try writer_alloc.toOwnedSlice();
 }
 
-fn sys_tape_arg3(comptime TAPE_REG: reg.r64, writer: *Writer, sys: usize, arg1: usize, arg2: usize) !usize {
+fn sys_tape_arg3_legacy(
+    comptime TAPE_REG: reg.r64,
+    writer: *Writer,
+    sys: usize,
+    arg1: usize,
+    arg2: usize,
+) !usize {
     var written: usize = 0;
 
     // Backup the tape register on the stack

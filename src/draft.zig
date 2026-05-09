@@ -147,9 +147,9 @@ fn generate_code_2(allocator: std.mem.Allocator) ![]u8 {
 
     try engine.push(.rbp);
     try engine.mov(.rbp, .rsp);
-    try engine.sub(.rsp, .{ .imm = 16 });
-    try engine.mov(rm_a, .{ .imm = 0 });
-    try engine.mov(rm_b, .{ .imm = 1 });
+    try engine.sub(.rsp, Engine.Arg.immediate(16));
+    try engine.mov(rm_a, Engine.Arg.immediate(0));
+    try engine.mov(rm_b, Engine.Arg.immediate(1));
     try engine.xor(.rax, .rax);
     try engine.dec(.rdi);
     try engine.bind(loop_start);
@@ -164,7 +164,7 @@ fn generate_code_2(allocator: std.mem.Allocator) ![]u8 {
     try engine.jmp(.{ .label = loop_start });
     try engine.bind(loop_end);
     try engine.mov(.rax, rm_b);
-    try engine.add(.rsp, .{ .imm = 16 });
+    try engine.add(.rsp, Engine.Arg.immediate(16));
     try engine.pop(.rbp);
     try engine.ret();
 

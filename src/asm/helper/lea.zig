@@ -18,8 +18,8 @@ pub fn lea(writer: *std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void {
             std.log.debug("asm lea: 8-bit destination is invalid dst={any}", .{dst});
             return error.InvalidOperand;
         },
-        .Reg16 => try opcode.lea.r16_m(writer, dst.reg16() orelse unreachable, try src.mem16() orelse return error.InvalidOperand),
-        .Reg32 => try opcode.lea.r32_m(writer, dst.reg32() orelse unreachable, try src.mem32() orelse return error.InvalidOperand),
-        .Reg64 => try opcode.lea.r64_m(writer, dst.reg64() orelse unreachable, try src.mem64() orelse return error.InvalidOperand),
+        .Reg16 => try opcode.lea.r16_m(writer, dst.as_reg16() orelse unreachable, try src.as_mem16() orelse return error.InvalidOperand),
+        .Reg32 => try opcode.lea.r32_m(writer, dst.as_reg32() orelse unreachable, try src.as_mem32() orelse return error.InvalidOperand),
+        .Reg64 => try opcode.lea.r64_m(writer, dst.as_reg64() orelse unreachable, try src.as_mem64() orelse return error.InvalidOperand),
     };
 }

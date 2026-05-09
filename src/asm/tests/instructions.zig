@@ -1,18 +1,20 @@
 const std = @import("std");
 
 const Engine = @import("../engine.zig");
+const Arg = Engine.Arg;
 
 test "asm engine arithmetic helpers" {
     var engine = Engine.init(std.testing.allocator);
     defer engine.deinit();
 
-    try engine.add(.rax, .{ .imm = 1 });
-    try engine.cmp(.rax, .{ .imm = 1 });
-    try engine.sub(.rsp, .{ .imm = 8 });
+    try engine.add(.rax, Arg.immediate(1));
+    try engine.cmp(.rax, Arg.immediate(1));
+    try engine.sub(.rsp, Arg.immediate(8));
     try engine.xor(.eax, .eax);
     try engine.@"and"(.rax, .rcx);
-    try engine.@"or"(.eax, .{ .imm = 0x7f });
-    try engine.@"test"(.al, .{ .imm = 1 });
+    try engine.@"or"(.eax, Arg.immediate(0x7f));
+    try engine.@"test"(.al, Arg.immediate(1));
+    try engine.@"test"(.al, Arg.raw8(0xff));
     try engine.inc(.rax);
     try engine.dec(.{ .mem = .{ .size = .byte, .reg = .rax } });
 
@@ -22,7 +24,8 @@ test "asm engine arithmetic helpers" {
         0x48, 0x81, 0xEC, 0x08, 0x00, 0x00, 0x00,
         0x33, 0xC0, 0x48, 0x23, 0xC1, 0x81, 0xC8,
         0x7F, 0x00, 0x00, 0x00, 0xF6, 0xC0, 0x01,
-        0x48, 0xFF, 0xC0, 0xFE, 0x08,
+        0xF6, 0xC0, 0xFF, 0x48, 0xFF, 0xC0, 0xFE,
+        0x08,
     }, engine.bytes());
 }
 
