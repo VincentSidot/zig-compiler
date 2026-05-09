@@ -7,6 +7,11 @@ pub const Label = struct {
     index: usize,
 };
 
+/// Symbolic address patched after final machine code emission.
+pub const Symbol = struct {
+    index: usize,
+};
+
 /// Condition code used by conditional branches.
 pub const Condition = encoder.opcode.jcc.Condition;
 
@@ -195,6 +200,16 @@ pub const Immediate = union(enum) {
     }
 };
 
+/// Symbol reference plus the encoding kind expected by the consuming instruction.
+pub const SymbolRef = struct {
+    id: Symbol,
+    kind: Kind,
+
+    pub const Kind = enum {
+        abs64,
+    };
+};
+
 /// Generic instruction operand used by the high-level assembly API.
 pub const Arg = union(enum) {
     rax,
@@ -267,6 +282,7 @@ pub const Arg = union(enum) {
     r15b,
     mem: Memory,
     imm: Immediate,
+    sym: SymbolRef,
 
     /// Returns whether the operand is a 64-bit register.
     pub fn is_register64(self: Arg) bool {
@@ -326,6 +342,14 @@ pub const Arg = union(enum) {
     pub fn is_immediate(self: Arg) bool {
         return switch (self) {
             .imm => true,
+            else => false,
+        };
+    }
+
+    /// Returns whether the operand is a symbolic reference.
+    pub fn is_symbol(self: Arg) bool {
+        return switch (self) {
+            .sym => true,
             else => false,
         };
     }
@@ -518,6 +542,11 @@ pub const Arg = union(enum) {
     /// Constructs a 64-bit raw-bit-pattern immediate operand.
     pub fn raw64(value: u64) Arg {
         return .{ .imm = .{ .raw64 = value } };
+    }
+
+    /// Constructs a 64-bit absolute symbol reference operand.
+    pub fn sym64(id: Symbol) Arg {
+        return .{ .sym = .{ .id = id, .kind = .abs64 } };
     }
 };
 

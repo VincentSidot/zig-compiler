@@ -6,6 +6,7 @@ pub const Condition = op_file.Condition;
 pub const JccTarget = op_file.JccTarget;
 pub const JumpTarget = op_file.JumpTarget;
 pub const Label = op_file.Label;
+pub const Symbol = op_file.Symbol;
 
 pub const BranchEncoding = enum {
     rel8,

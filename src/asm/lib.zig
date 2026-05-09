@@ -25,6 +25,8 @@ pub const JccTarget = op_file.JccTarget;
 pub const JumpTarget = op_file.JumpTarget;
 /// Symbolic branch destination allocated by the engine.
 pub const Label = op_file.Label;
+/// Symbolic address patched after final machine code emission.
+pub const Symbol = op_file.Symbol;
 /// Sized memory operand used by the assembly API.
 pub const Memory = op_file.Memory;
 /// Explicit size tag for memory operands.

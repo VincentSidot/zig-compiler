@@ -83,7 +83,7 @@ fn compile_inner_engine(interpreted: *BrainfuckInterpreter) ![]u8 {
     const allocator = interpreted.allocator;
 
     var engine = Engine.init(allocator);
-    errdefer engine.deinit();
+    defer engine.deinit();
 
     const _putc = try engine.label();
     const PUTC: Engine.CallTarget = .{ .label = _putc };
@@ -192,9 +192,8 @@ fn compile_inner_engine(interpreted: *BrainfuckInterpreter) ![]u8 {
         1,
     );
 
-    const bytecode = try engine.finalize();
-
-    return bytecode;
+    try engine.finalize();
+    return try engine.takeBytes();
 }
 
 fn sys_tape_arg3_engine(

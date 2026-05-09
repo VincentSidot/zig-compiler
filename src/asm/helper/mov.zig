@@ -2,13 +2,22 @@ const std = @import("std");
 
 const op_file = @import("../op.zig");
 const Arg = op_file.Arg;
+const lower = @import("../lower.zig");
 
 const encoder = @import("../../encoder/lib.zig");
 const opcode = encoder.opcode;
 
-pub fn mov(writer: ?*std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void {
+pub fn mov(
+    writer: ?*std.Io.Writer,
+    written: *usize,
+    dst: Arg,
+    src: Arg,
+    allocator: std.mem.Allocator,
+    symbol_patches: ?*std.ArrayList(lower.SymbolPatch),
+) !void {
     if (dst.is_register()) {
         if (src.is_register()) return movRegReg(writer, written, dst, src);
+        if (src.is_symbol()) return movRegSym(writer, written, dst, src, allocator, symbol_patches);
         if (src.is_immediate()) return movRegImm(writer, written, dst, src);
         if (src.is_memory()) return movRegMem(writer, written, dst, src);
     }
@@ -19,6 +28,33 @@ pub fn mov(writer: ?*std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void {
     }
 
     return error.InvalidOperand;
+}
+
+fn movRegSym(
+    writer: ?*std.Io.Writer,
+    written: *usize,
+    dst: Arg,
+    src: Arg,
+    allocator: std.mem.Allocator,
+    symbol_patches: ?*std.ArrayList(lower.SymbolPatch),
+) !void {
+    const sym = switch (src) {
+        .sym => |sym| sym,
+        else => return error.InvalidOperand,
+    };
+    if (sym.kind != .abs64) return error.InvalidOperand;
+
+    const reg = dst.as_reg64() orelse return error.InvalidOperand;
+    const patch_offset = written.* + 2;
+    written.* += try opcode.mov.r64_imm64(writer, reg, 0);
+
+    if (symbol_patches) |patches| {
+        try patches.append(allocator, .{
+            .symbol = sym.id,
+            .offset = patch_offset,
+            .kind = .abs64,
+        });
+    }
 }
 
 fn movRegReg(writer: ?*std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void {

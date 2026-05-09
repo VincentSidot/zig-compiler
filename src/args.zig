@@ -99,7 +99,7 @@ fn parseArgs(args: []const []const u8, allocator: Allocator) !?Args {
 
 fn printHelp() void {
     printf(
-        \\Usage: rce [options] <input.bf>
+        \\Usage: program [options] <input.bf>
         \\
         \\Options:
         \\  -h, --help            Show this help message

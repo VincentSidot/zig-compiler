@@ -4,12 +4,18 @@ const log = std.log;
 pub fn main2(init: std.process.Init) !void {
     _ = init;
 
-    const draft = @import("draft.zig");
-    try draft.run_draft();
+    const fib = @import("apps/fib.zig");
+    try fib.run();
+}
+
+pub fn main3(init: std.process.Init) !void {
+    const brainfuck = @import("apps/brainfuck.zig");
+
+    try brainfuck.start(init);
 }
 
 pub fn main(init: std.process.Init) !void {
-    const brainfuck = @import("brainfuck.zig");
+    const elf = @import("apps/elf.zig");
 
-    try brainfuck.start(init);
+    try elf.generate(init.io);
 }

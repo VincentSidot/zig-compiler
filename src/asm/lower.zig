@@ -17,6 +17,17 @@ const xor_helper = @import("helper/xor.zig");
 pub const Context = struct {
     allocator: std.mem.Allocator,
     fixups: *std.ArrayList(branch_helper.Fixup),
+    symbol_patches: ?*std.ArrayList(SymbolPatch),
+};
+
+pub const SymbolPatch = struct {
+    symbol: ir.Symbol,
+    offset: usize,
+    kind: Kind,
+
+    pub const Kind = enum {
+        abs64,
+    };
 };
 
 /// Lowers an IR instruction using its default branch encoding.
@@ -42,6 +53,7 @@ pub fn sizeOf(
     try opWithEncoding(inst, branch_encoding, null, &written, .{
         .allocator = allocator,
         .fixups = &fixups,
+        .symbol_patches = null,
     });
 
     return written;
@@ -68,7 +80,7 @@ pub fn opWithEncoding(
 ) !void {
     switch (inst) {
         .bind => {},
-        .mov => |x| try mov_helper.mov(writer, written, x.dst, x.src),
+        .mov => |x| try mov_helper.mov(writer, written, x.dst, x.src, ctx.allocator, ctx.symbol_patches),
         .add => |x| try add_helper.add(writer, written, x.dst, x.src),
         .sub => |x| try sub_helper.sub(writer, written, x.dst, x.src),
         .cmp => |x| try cmp_helper.cmp(writer, written, x.dst, x.src),
