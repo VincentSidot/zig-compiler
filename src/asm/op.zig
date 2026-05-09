@@ -8,12 +8,104 @@ pub const Label = struct {
 
 pub const Condition = encoder.opcode.jcc.Condition;
 
-pub const BranchTarget = union(enum) {
+pub const RelativeTarget = union(enum) {
     label: Label,
     rel: i32,
-    reg: Arg,
-    mem: Memory,
 };
+
+pub const BranchRegister = enum {
+    rax,
+    rbx,
+    rcx,
+    rdx,
+    rsi,
+    rdi,
+    rbp,
+    rsp,
+    r8,
+    r9,
+    r10,
+    r11,
+    r12,
+    r13,
+    r14,
+    r15,
+
+    pub fn as_encoder(self: BranchRegister) encoder.RegisterIndex_64 {
+        return switch (self) {
+            .rax => .RAX,
+            .rbx => .RBX,
+            .rcx => .RCX,
+            .rdx => .RDX,
+            .rsi => .RSI,
+            .rdi => .RDI,
+            .rbp => .RBP,
+            .rsp => .RSP,
+            .r8 => .R8,
+            .r9 => .R9,
+            .r10 => .R10,
+            .r11 => .R11,
+            .r12 => .R12,
+            .r13 => .R13,
+            .r14 => .R14,
+            .r15 => .R15,
+        };
+    }
+
+    fn as_reg_m(self: BranchRegister) RegM {
+        return switch (self) {
+            .rax => .rax,
+            .rbx => .rbx,
+            .rcx => .rcx,
+            .rdx => .rdx,
+            .rsi => .rsi,
+            .rdi => .rdi,
+            .rbp => .rbp,
+            .rsp => .rsp,
+            .r8 => .r8,
+            .r9 => .r9,
+            .r10 => .r10,
+            .r11 => .r11,
+            .r12 => .r12,
+            .r13 => .r13,
+            .r14 => .r14,
+            .r15 => .r15,
+        };
+    }
+};
+
+pub const BranchIndex = struct {
+    reg: BranchRegister,
+    scale: Scale = .x1,
+};
+
+pub const BranchMemory = struct {
+    reg: BranchRegister,
+    disp: i64 = 0,
+    index: ?BranchIndex = null,
+
+    pub fn as_memory(self: BranchMemory) Memory {
+        return .{
+            .size = .qword,
+            .reg = self.reg.as_reg_m(),
+            .disp = self.disp,
+            .index = if (self.index) |idx| .{
+                .reg = idx.reg.as_reg_m(),
+                .scale = idx.scale,
+            } else null,
+        };
+    }
+};
+
+pub const JumpTarget = union(enum) {
+    label: Label,
+    rel: i32,
+    reg: BranchRegister,
+    mem: BranchMemory,
+};
+
+pub const CallTarget = JumpTarget;
+pub const JccTarget = RelativeTarget;
 
 pub const MemSize = enum {
     byte,

@@ -7,6 +7,7 @@ test {
     std.testing.refAllDecls(@import("./brainfuck/runner.zig"));
     std.testing.refAllDecls(@import("./brainfuck/tokenizer.zig"));
     std.testing.refAllDecls(@import("./asm/op.zig"));
+    std.testing.refAllDecls(@import("./asm/ir.zig"));
     std.testing.refAllDecls(@import("./asm/engine.zig"));
     std.testing.refAllDecls(@import("./asm/helper/add.zig"));
     std.testing.refAllDecls(@import("./asm/helper/bit.zig"));

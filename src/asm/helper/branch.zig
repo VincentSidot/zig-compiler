@@ -1,12 +1,12 @@
 const std = @import("std");
-const log = std.log;
 
 const op_file = @import("../op.zig");
 const Arg = op_file.Arg;
-const BranchTarget = op_file.BranchTarget;
+const CallTarget = op_file.CallTarget;
 const Condition = op_file.Condition;
+const JccTarget = op_file.JccTarget;
+const JumpTarget = op_file.JumpTarget;
 const Label = op_file.Label;
-const Memory = op_file.Memory;
 
 const helper_file = @import("../../encoder/helper.zig");
 const patch = helper_file.patch;
@@ -17,6 +17,7 @@ const opcode = encoder.opcode;
 
 pub const LabelInfo = struct {
     offset: ?usize = null,
+    bound: bool = false,
 };
 
 pub const FixupKind = enum {
@@ -41,18 +42,12 @@ pub fn jmp(
     written: *usize,
     allocator: std.mem.Allocator,
     fixups: *std.ArrayList(Fixup),
-    target: BranchTarget,
+    target: JumpTarget,
 ) !void {
     switch (target) {
         .label => |label| try rel32Label(writer, written, allocator, fixups, label, .jmp),
         .rel => |rel| written.* += try opcode.jmp.rel32(writer, rel),
-        .reg => |reg| {
-            const r64 = reg.as_reg64() orelse {
-                log.debug("jmp indirect register target must be a 64-bit register", .{});
-                return error.InvalidOperand;
-            };
-            written.* += try opcode.jmp.r64(writer, r64);
-        },
+        .reg => |reg| written.* += try opcode.jmp.r64(writer, reg.as_encoder()),
         .mem => |mem| {
             const rm64 = try qwordMemory(mem);
             written.* += try opcode.jmp.rm64(writer, rm64);
@@ -65,18 +60,12 @@ pub fn call(
     written: *usize,
     allocator: std.mem.Allocator,
     fixups: *std.ArrayList(Fixup),
-    target: BranchTarget,
+    target: CallTarget,
 ) !void {
     switch (target) {
         .label => |label| try rel32Label(writer, written, allocator, fixups, label, .call),
         .rel => |rel| written.* += try opcode.call.rel32(writer, rel),
-        .reg => |reg| {
-            const r64 = reg.as_reg64() orelse {
-                log.debug("call indirect register target must be a 64-bit register", .{});
-                return error.InvalidOperand;
-            };
-            written.* += try opcode.call.r64(writer, r64);
-        },
+        .reg => |reg| written.* += try opcode.call.r64(writer, reg.as_encoder()),
         .mem => |mem| {
             const rm64 = try qwordMemory(mem);
             written.* += try opcode.call.rm64(writer, rm64);
@@ -90,19 +79,11 @@ pub fn jcc(
     allocator: std.mem.Allocator,
     fixups: *std.ArrayList(Fixup),
     condition: Condition,
-    target: BranchTarget,
+    target: JccTarget,
 ) !void {
     switch (target) {
         .label => |label| try jccLabel(writer, written, allocator, fixups, condition, label),
         .rel => |rel| written.* += try opcode.jcc.rel32(writer, condition, rel),
-        .reg => {
-            log.debug("jcc does not support register targets; use a label or relative displacement", .{});
-            return error.InvalidOperand;
-        },
-        .mem => {
-            log.debug("jcc does not support memory targets; use a label or relative displacement", .{});
-            return error.InvalidOperand;
-        },
     }
 }
 
@@ -153,16 +134,8 @@ fn rel32Label(
     });
 }
 
-fn qwordMemory(mem: Memory) !encoder.RegisterMemory_64 {
-    if (mem.size != .qword) {
-        log.debug("indirect branch memory target must be qword sized", .{});
-        return error.InvalidOperand;
-    }
-
-    return (try (Arg{ .mem = mem }).as_mem64()) orelse {
-        log.debug("failed to convert indirect branch memory target to encoder rm64 operand", .{});
-        return error.InvalidOperand;
-    };
+fn qwordMemory(mem: op_file.BranchMemory) !encoder.RegisterMemory_64 {
+    return (try (Arg{ .mem = mem.as_memory() }).as_mem64()) orelse return error.InvalidOperand;
 }
 
 pub fn resolve_fixups(

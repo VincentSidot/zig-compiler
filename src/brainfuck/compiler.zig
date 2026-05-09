@@ -82,10 +82,10 @@ fn compile_inner_engine(interpreted: *BrainfuckInterpreter) ![]u8 {
     errdefer engine.deinit();
 
     const _putc = try engine.label();
-    const PUTC: Engine.BranchTarget = .{ .label = _putc };
+    const PUTC: Engine.CallTarget = .{ .label = _putc };
 
     const _getc = try engine.label();
-    const GETC: Engine.BranchTarget = .{ .label = _getc };
+    const GETC: Engine.CallTarget = .{ .label = _getc };
 
     const LoopStack = struct {
         start: Engine.Label,
@@ -103,8 +103,8 @@ fn compile_inner_engine(interpreted: *BrainfuckInterpreter) ![]u8 {
 
     // Generate the code.
 
-    try engine.push(TAPE_REGISTER);
-    try engine.mov(TAPE_REGISTER, .rdi);
+    engine.push(TAPE_REGISTER);
+    engine.mov(TAPE_REGISTER, .rdi);
 
     for (interpreted.program) |code| {
         switch (code.kind) {
@@ -121,27 +121,27 @@ fn compile_inner_engine(interpreted: *BrainfuckInterpreter) ![]u8 {
                 const trunc: i8 = @truncate(disp);
                 const raw: u8 = @bitCast(trunc);
 
-                try engine.add(
+                engine.add(
                     TAPE_REGISTIER_MEM,
                     Arg.raw8(raw),
                 );
             },
             .move => |disp| {
-                try engine.add(TAPE_REGISTER, Arg.immediate(disp));
+                engine.add(TAPE_REGISTER, Arg.immediate(disp));
             },
             .input => {
-                try engine.call(GETC);
+                engine.call(GETC);
             },
             .output => {
-                try engine.call(PUTC);
+                engine.call(PUTC);
             },
             .loop_start => {
                 const loop_start = try engine.label();
                 const loop_end = try engine.label();
 
                 try engine.bind(loop_start);
-                try engine.@"test"(TAPE_REGISTIER_MEM, Arg.raw8(0xFF));
-                try engine.jcc(.e, .{ .label = loop_end });
+                engine.@"test"(TAPE_REGISTIER_MEM, Arg.raw8(0xFF));
+                engine.jcc(.e, .{ .label = loop_end });
 
                 try loop_stack.append(allocator, .{
                     .start = loop_start,
@@ -153,15 +153,15 @@ fn compile_inner_engine(interpreted: *BrainfuckInterpreter) ![]u8 {
                     return error.UnmatchedLoopEnd;
                 };
 
-                try engine.@"test"(TAPE_REGISTIER_MEM, Arg.raw8(0xFF));
-                try engine.jcc(.ne, .{ .label = loop.start });
+                engine.@"test"(TAPE_REGISTIER_MEM, Arg.raw8(0xFF));
+                engine.jcc(.ne, .{ .label = loop.start });
                 try engine.bind(loop.end);
             },
         }
     }
 
-    try engine.pop(TAPE_REGISTER);
-    try engine.ret();
+    engine.pop(TAPE_REGISTER);
+    engine.ret();
 
     // Define PUTC & GETC functions
 
@@ -207,18 +207,18 @@ fn sys_tape_arg3_engine(
     // Define label
     try engine.bind(label);
 
-    try engine.push(TAPE_REG);
+    engine.push(TAPE_REG);
 
     if (TAPE_REG != .rsi) {
-        try engine.mov(.rsi, TAPE_REG);
+        engine.mov(.rsi, TAPE_REG);
     }
 
-    try engine.mov(.rdx, Engine.Arg.unsigned(arg2));
-    try engine.mov(.rdi, Engine.Arg.unsigned(arg1));
-    try engine.mov(.rax, Engine.Arg.unsigned(sys));
-    try engine.syscall();
-    try engine.pop(TAPE_REG);
-    try engine.ret();
+    engine.mov(.rdx, Engine.Arg.unsigned(arg2));
+    engine.mov(.rdi, Engine.Arg.unsigned(arg1));
+    engine.mov(.rax, Engine.Arg.unsigned(sys));
+    engine.syscall();
+    engine.pop(TAPE_REG);
+    engine.ret();
 
     return;
 }

@@ -145,28 +145,28 @@ fn generate_code_2(allocator: std.mem.Allocator) ![]u8 {
     const loop_start = try engine.label();
     const loop_end = try engine.label();
 
-    try engine.push(.rbp);
-    try engine.mov(.rbp, .rsp);
-    try engine.sub(.rsp, Engine.Arg.immediate(16));
-    try engine.mov(rm_a, Engine.Arg.immediate(0));
-    try engine.mov(rm_b, Engine.Arg.immediate(1));
-    try engine.xor(.rax, .rax);
-    try engine.dec(.rdi);
+    engine.push(.rbp);
+    engine.mov(.rbp, .rsp);
+    engine.sub(.rsp, Engine.Arg.immediate(16));
+    engine.mov(rm_a, Engine.Arg.immediate(0));
+    engine.mov(rm_b, Engine.Arg.immediate(1));
+    engine.xor(.rax, .rax);
+    engine.dec(.rdi);
     try engine.bind(loop_start);
-    try engine.cmp(.rax, .rdi);
-    try engine.jcc(.ge, .{ .label = loop_end });
-    try engine.inc(.rax);
-    try engine.mov(.r8, rm_a);
-    try engine.add(.r8, rm_b);
-    try engine.mov(.r9, rm_b);
-    try engine.mov(rm_a, .r9);
-    try engine.mov(rm_b, .r8);
-    try engine.jmp(.{ .label = loop_start });
+    engine.cmp(.rax, .rdi);
+    engine.jcc(.ge, .{ .label = loop_end });
+    engine.inc(.rax);
+    engine.mov(.r8, rm_a);
+    engine.add(.r8, rm_b);
+    engine.mov(.r9, rm_b);
+    engine.mov(rm_a, .r9);
+    engine.mov(rm_b, .r8);
+    engine.jmp(.{ .label = loop_start });
     try engine.bind(loop_end);
-    try engine.mov(.rax, rm_b);
-    try engine.add(.rsp, Engine.Arg.immediate(16));
-    try engine.pop(.rbp);
-    try engine.ret();
+    engine.mov(.rax, rm_b);
+    engine.add(.rsp, Engine.Arg.immediate(16));
+    engine.pop(.rbp);
+    engine.ret();
 
     const bytecode = try engine.finalize();
 
