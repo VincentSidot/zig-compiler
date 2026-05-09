@@ -3,6 +3,7 @@ const posix = std.posix;
 
 const s_print = fn (comptime format: []const u8, args: anytype) void;
 
+/// Builds a buffered print function bound to a fixed file handle and static buffer.
 pub fn print_maker(
     comptime file: std.Io.File,
     comptime buffer_size: usize,
@@ -34,7 +35,9 @@ pub fn print_maker(
     return _inner.@"fn";
 }
 
+/// Buffered stdout printer for small formatted messages.
 pub const printf = print_maker(.stdout(), 1024);
+/// Buffered stderr printer for small formatted messages.
 pub const eprintf = print_maker(.stderr(), 1024);
 
 const logFunctionType: type = fn (
@@ -44,6 +47,7 @@ const logFunctionType: type = fn (
     args: anytype,
 ) void;
 
+/// Builds a `std.log` sink, optionally as a no-op implementation.
 pub fn logFunctionMake(comptime buffer_size: usize, comptime noop: bool) logFunctionType {
     const _inner = struct {
         fn logFunction(
@@ -86,6 +90,7 @@ fn isatty(fd: c_int) bool {
     return std.os.linux.ioctl(fd, std.posix.T.IOCGWINSZ, @intFromPtr(&out)) == 0;
 }
 
+/// Switches stdin to raw terminal mode when running on a tty.
 pub fn setRawMode() !void {
     if (previousTermios != null) {
         return error.AlreadyInRawMode;
@@ -114,6 +119,7 @@ pub fn setRawMode() !void {
     };
 }
 
+/// Restores the terminal settings previously saved by `setRawMode`.
 pub fn restoreTerminal() !void {
     if (previousTermios == null) {
         return;

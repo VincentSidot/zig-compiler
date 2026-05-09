@@ -13,11 +13,13 @@ const sub_helper = @import("helper/sub.zig");
 const syscall_helper = @import("helper/syscall.zig");
 const xor_helper = @import("helper/xor.zig");
 
+/// Shared lowering state used during sizing and byte emission.
 pub const Context = struct {
     allocator: std.mem.Allocator,
     fixups: *std.ArrayList(branch_helper.Fixup),
 };
 
+/// Lowers an IR instruction using its default branch encoding.
 pub fn op(
     inst: ir.Op,
     writer: ?*std.Io.Writer,
@@ -27,6 +29,7 @@ pub fn op(
     try opWithEncoding(inst, null, writer, written, ctx);
 }
 
+/// Returns the encoded size of an IR instruction for the selected branch encoding.
 pub fn sizeOf(
     allocator: std.mem.Allocator,
     inst: ir.Op,
@@ -44,6 +47,7 @@ pub fn sizeOf(
     return written;
 }
 
+/// Emits one IR instruction to `writer` using the selected branch encoding.
 pub fn emit(
     inst: ir.Op,
     branch_encoding: ?ir.BranchEncoding,
@@ -54,6 +58,7 @@ pub fn emit(
     try opWithEncoding(inst, branch_encoding, writer, written, ctx);
 }
 
+/// Lowers an IR instruction using an explicit branch encoding override.
 pub fn opWithEncoding(
     inst: ir.Op,
     branch_encoding: ?ir.BranchEncoding,

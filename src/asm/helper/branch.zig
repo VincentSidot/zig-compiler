@@ -16,21 +16,25 @@ const O = helper_file.OFFSETS;
 const encoder = @import("../../encoder/lib.zig");
 const opcode = encoder.opcode;
 
+/// Per-label metadata used while resolving branch fixups.
 pub const LabelInfo = struct {
     offset: ?usize = null,
     bound: bool = false,
 };
 
+/// Encoded branch family used to choose the correct patch offsets.
 pub const FixupKind = enum {
     jmp,
     jcc,
 };
 
+/// Branch displacement width used by a recorded fixup.
 pub const FixupSize = enum {
     _8,
     _32,
 };
 
+/// Placeholder branch reference to be patched once label offsets are known.
 pub const Fixup = struct {
     label: Label,
     base_offset: usize,
@@ -38,6 +42,7 @@ pub const Fixup = struct {
     size: FixupSize,
 };
 
+/// Lowers a `jmp` target and records any label fixup required for later patching.
 pub fn jmp(
     writer: ?*std.Io.Writer,
     written: *usize,
@@ -57,6 +62,7 @@ pub fn jmp(
     }
 }
 
+/// Lowers a `call` target and records any label fixup required for later patching.
 pub fn call(
     writer: ?*std.Io.Writer,
     written: *usize,
@@ -75,6 +81,7 @@ pub fn call(
     }
 }
 
+/// Lowers a conditional branch target and records any label fixup required for later patching.
 pub fn jcc(
     writer: ?*std.Io.Writer,
     written: *usize,
@@ -178,6 +185,7 @@ fn qwordMemory(mem: op_file.BranchMemory) !encoder.RegisterMemory_64 {
     return (try (Arg{ .mem = mem.as_memory() }).as_mem64()) orelse return error.InvalidOperand;
 }
 
+/// Applies recorded branch fixups to the final emitted byte buffer.
 pub fn resolve_fixups(
     bytes: []u8,
     fixups: []const Fixup,

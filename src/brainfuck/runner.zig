@@ -6,16 +6,22 @@ const helper = @import("../helper.zig");
 const setRawMode = helper.setRawMode;
 const restoreTerminal = helper.restoreTerminal;
 
+/// Raw Brainfuck token emitted by the tokenizer.
 pub const Token = tokenizer.Token;
+/// Kinds of Brainfuck source tokens.
 pub const TokenKind = tokenizer.TokenKind;
+/// Lowered Brainfuck instruction emitted by the lexer stage.
 pub const Lexer = lexer.Lexer;
+/// Kinds of lowered Brainfuck instructions.
 pub const LexerKind = lexer.LexerKind;
 
+/// Parsed Brainfuck program that can be interpreted directly.
 pub const BrainfuckInterpreter = @This();
 
 allocator: std.mem.Allocator,
 program: []Lexer,
 
+/// Loads a Brainfuck source file, tokenizes it, and lowers it to an interpreter program.
 pub fn load_file(io: std.Io, allocator: std.mem.Allocator, path: []const u8) !BrainfuckInterpreter {
     const source = try std.Io.Dir.readFileAlloc(std.Io.Dir.cwd(), io, path, allocator, .unlimited);
     defer allocator.free(source);
@@ -23,10 +29,12 @@ pub fn load_file(io: std.Io, allocator: std.mem.Allocator, path: []const u8) !Br
     return try from_source(allocator, source);
 }
 
+/// Releases the lowered Brainfuck program owned by the interpreter.
 pub fn deinit(self: *BrainfuckInterpreter) void {
     self.allocator.free(self.program);
 }
 
+/// Interprets the program against `mem`, using one byte per Brainfuck cell.
 pub fn interpret(self: *const BrainfuckInterpreter, mem: []u8) !void {
     if (mem.len == 0) {
         return error.EmptyMemory;

@@ -3,6 +3,7 @@ const helper = @import("types.zig");
 
 const Position = helper.Position;
 
+/// Kinds of Brainfuck source tokens preserved by the tokenizer.
 pub const TokenKind = enum {
     move_right,
     move_left,
@@ -14,6 +15,7 @@ pub const TokenKind = enum {
     loop_end,
 };
 
+/// Token with source position metadata.
 pub const Token = struct {
     kind: TokenKind,
     position: Position,
@@ -27,6 +29,7 @@ pub const Token = struct {
 //     return tokenize(allocator, source);
 // }
 
+/// Scans Brainfuck source text and returns one token per significant character.
 pub fn tokenize(allocator: std.mem.Allocator, source: []const u8) ![]Token {
     var line: usize = 1;
     var column: usize = 1;

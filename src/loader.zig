@@ -6,6 +6,7 @@ const log = std.log;
 
 const RemoteFunction = fn ([*c]const u8) callconv(.c) void;
 
+/// Returns a tiny loader type that owns an executable mapping for the function signature `F`.
 pub fn FunctionLoader(comptime F: type) type {
     enforce_calling_convention(F);
     return struct {
@@ -26,10 +27,12 @@ pub fn FunctionLoader(comptime F: type) type {
         //       .rsi = true,
         //     });
 
+        /// Returns the loaded function pointer.
         pub fn f(self: *const Self) *const F {
             return self.ptr;
         }
 
+        /// Unmaps the executable memory owned by this loader.
         pub fn deinit(self: Self) void {
             const ptr: [*]const u8 = @ptrCast(self.ptr);
             _ = system.munmap(ptr, self.size);
@@ -65,6 +68,7 @@ fn apply_protect(comptime F: type, data: []const u8) !FunctionLoader(F) {
     return loader;
 }
 
+/// Copies raw machine code into an executable mapping and returns a typed loader for `F`.
 pub fn load_from_memory(comptime F: type, data: []const u8) !FunctionLoader(F) {
     log.debug("Loading function from memory: {d} bytes", .{data.len});
 
@@ -104,6 +108,7 @@ pub fn load_from_memory(comptime F: type, data: []const u8) !FunctionLoader(F) {
     return loader;
 }
 
+/// Loads machine code from a file into an executable mapping and returns a typed loader for `F`.
 pub fn load_from_file(comptime F: type, path: []const u8) !FunctionLoader(F) {
     const PROT = system.PROT;
 

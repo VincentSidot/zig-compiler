@@ -2,17 +2,21 @@ const std = @import("std");
 const encoder = @import("../encoder/lib.zig");
 const encoder_reg = @import("../encoder/reg.zig");
 
+/// Symbolic branch destination recorded by the engine and resolved during layout.
 pub const Label = struct {
     index: usize,
 };
 
+/// Condition code used by conditional branches.
 pub const Condition = encoder.opcode.jcc.Condition;
 
+/// Relative branch target represented as either a label or a fixed displacement.
 pub const RelativeTarget = union(enum) {
     label: Label,
     rel: i32,
 };
 
+/// Register set accepted by indirect control-flow instructions.
 pub const BranchRegister = enum {
     rax,
     rbx,
@@ -31,6 +35,7 @@ pub const BranchRegister = enum {
     r14,
     r15,
 
+    /// Converts the branch register to the encoder's 64-bit register enum.
     pub fn as_encoder(self: BranchRegister) encoder.RegisterIndex_64 {
         return switch (self) {
             .rax => .RAX,
@@ -74,16 +79,19 @@ pub const BranchRegister = enum {
     }
 };
 
+/// Scaled index register used by `BranchMemory`.
 pub const BranchIndex = struct {
     reg: BranchRegister,
     scale: Scale = .x1,
 };
 
+/// Memory operand accepted by indirect `jmp` and `call`.
 pub const BranchMemory = struct {
     reg: BranchRegister,
     disp: i64 = 0,
     index: ?BranchIndex = null,
 
+    /// Converts a branch memory operand to the generic memory representation.
     pub fn as_memory(self: BranchMemory) Memory {
         return .{
             .size = .qword,
@@ -97,6 +105,7 @@ pub const BranchMemory = struct {
     }
 };
 
+/// Target accepted by `jmp`.
 pub const JumpTarget = union(enum) {
     label: Label,
     rel: i32,
@@ -104,9 +113,12 @@ pub const JumpTarget = union(enum) {
     mem: BranchMemory,
 };
 
+/// Target accepted by `call`.
 pub const CallTarget = JumpTarget;
+/// Target accepted by `jcc`.
 pub const JccTarget = RelativeTarget;
 
+/// Explicit size attached to generic memory operands.
 pub const MemSize = enum {
     byte,
     word,
@@ -114,6 +126,7 @@ pub const MemSize = enum {
     qword,
 };
 
+/// Immediate value wrapper that preserves either numeric intent or raw bit patterns.
 pub const Immediate = union(enum) {
     signed: i64,
     unsigned: u64,
@@ -122,6 +135,7 @@ pub const Immediate = union(enum) {
     raw32: u32,
     raw64: u64,
 
+    /// Encodes the immediate for an unsigned 8-bit instruction field.
     pub fn encode8(self: Immediate) !u8 {
         return switch (self) {
             .signed => |v| {
@@ -134,6 +148,7 @@ pub const Immediate = union(enum) {
         };
     }
 
+    /// Encodes the immediate for an unsigned 16-bit instruction field.
     pub fn encode16(self: Immediate) !u16 {
         return switch (self) {
             .signed => |v| {
@@ -146,6 +161,7 @@ pub const Immediate = union(enum) {
         };
     }
 
+    /// Encodes the immediate for an unsigned 32-bit instruction field.
     pub fn encode32(self: Immediate) !u32 {
         return switch (self) {
             .signed => |v| {
@@ -158,6 +174,7 @@ pub const Immediate = union(enum) {
         };
     }
 
+    /// Encodes the immediate for a 64-bit instruction field.
     pub fn encode64(self: Immediate) !u64 {
         return switch (self) {
             .signed => |v| @bitCast(v),
@@ -167,6 +184,7 @@ pub const Immediate = union(enum) {
         };
     }
 
+    /// Encodes the immediate for `push imm8`, preserving signed semantics.
     pub fn encodePush8(self: Immediate) !i8 {
         return switch (self) {
             .signed => |v| std.math.cast(i8, v) orelse return error.Overflow,
@@ -177,6 +195,7 @@ pub const Immediate = union(enum) {
     }
 };
 
+/// Generic instruction operand used by the high-level assembly API.
 pub const Arg = union(enum) {
     rax,
     eax,
@@ -249,6 +268,7 @@ pub const Arg = union(enum) {
     mem: Memory,
     imm: Immediate,
 
+    /// Returns whether the operand is a 64-bit register.
     pub fn is_register64(self: Arg) bool {
         return switch (self) {
             .rax, .rbx, .rcx, .rdx, .rsi, .rdi, .rbp, .rsp, .r8, .r9, .r10, .r11, .r12, .r13, .r14, .r15 => true,
@@ -256,6 +276,7 @@ pub const Arg = union(enum) {
         };
     }
 
+    /// Returns whether the operand is a 32-bit register.
     pub fn is_register32(self: Arg) bool {
         return switch (self) {
             .eax, .ebx, .ecx, .edx, .esi, .edi, .ebp, .esp, .r8d, .r9d, .r10d, .r11d, .r12d, .r13d, .r14d, .r15d => true,
@@ -263,6 +284,7 @@ pub const Arg = union(enum) {
         };
     }
 
+    /// Returns whether the operand is a 16-bit register.
     pub fn is_register16(self: Arg) bool {
         return switch (self) {
             .ax, .bx, .cx, .dx, .si, .di, .bp, .sp, .r8w, .r9w, .r10w, .r11w, .r12w, .r13w, .r14w, .r15w => true,
@@ -270,6 +292,7 @@ pub const Arg = union(enum) {
         };
     }
 
+    /// Returns whether the operand is an 8-bit register.
     pub fn is_register8(self: Arg) bool {
         return switch (self) {
             .al, .ah, .bl, .bh, .cl, .ch, .dl, .dh, .sil, .dil, .bpl, .spl, .r8b, .r9b, .r10b, .r11b, .r12b, .r13b, .r14b, .r15b => true,
@@ -277,10 +300,12 @@ pub const Arg = union(enum) {
         };
     }
 
+    /// Returns whether the operand is any register class.
     pub fn is_register(self: Arg) bool {
         return self.is_register64() or self.is_register32() or self.is_register16() or self.is_register8();
     }
 
+    /// Returns the register class for this operand, if it is a register.
     pub fn register(self: Arg) ?RegKind {
         if (self.is_register64()) return .Reg64;
         if (self.is_register32()) return .Reg32;
@@ -289,6 +314,7 @@ pub const Arg = union(enum) {
         return null;
     }
 
+    /// Returns whether the operand is memory.
     pub fn is_memory(self: Arg) bool {
         return switch (self) {
             .mem => true,
@@ -296,6 +322,7 @@ pub const Arg = union(enum) {
         };
     }
 
+    /// Returns whether the operand is an immediate.
     pub fn is_immediate(self: Arg) bool {
         return switch (self) {
             .imm => true,
@@ -303,6 +330,7 @@ pub const Arg = union(enum) {
         };
     }
 
+    /// Converts the operand to an encoder 8-bit register.
     pub fn as_reg8(self: Arg) ?encoder.RegisterIndex_8 {
         return switch (self) {
             .al => .AL,
@@ -329,6 +357,7 @@ pub const Arg = union(enum) {
         };
     }
 
+    /// Converts the operand to an encoder 16-bit register.
     pub fn as_reg16(self: Arg) ?encoder.RegisterIndex_16 {
         return switch (self) {
             .ax => .AX,
@@ -351,6 +380,7 @@ pub const Arg = union(enum) {
         };
     }
 
+    /// Converts the operand to an encoder 32-bit register.
     pub fn as_reg32(self: Arg) ?encoder.RegisterIndex_32 {
         return switch (self) {
             .eax => .EAX,
@@ -373,6 +403,7 @@ pub const Arg = union(enum) {
         };
     }
 
+    /// Converts the operand to an encoder 64-bit register.
     pub fn as_reg64(self: Arg) ?encoder.RegisterIndex_64 {
         return switch (self) {
             .rax => .RAX,
@@ -395,6 +426,7 @@ pub const Arg = union(enum) {
         };
     }
 
+    /// Converts the operand to an encoder 8-bit memory operand.
     pub fn as_mem8(self: Arg) !?encoder.RegisterMemory_8 {
         return switch (self) {
             .mem => |m| if (m.size == .byte) try m.encoderMem(encoder.RegisterMemory_8) else error.InvalidOperand,
@@ -402,6 +434,7 @@ pub const Arg = union(enum) {
         };
     }
 
+    /// Converts the operand to an encoder 16-bit memory operand.
     pub fn as_mem16(self: Arg) !?encoder.RegisterMemory_16 {
         return switch (self) {
             .mem => |m| if (m.size == .word) try m.encoderMem(encoder.RegisterMemory_16) else error.InvalidOperand,
@@ -409,6 +442,7 @@ pub const Arg = union(enum) {
         };
     }
 
+    /// Converts the operand to an encoder 32-bit memory operand.
     pub fn as_mem32(self: Arg) !?encoder.RegisterMemory_32 {
         return switch (self) {
             .mem => |m| if (m.size == .dword) try m.encoderMem(encoder.RegisterMemory_32) else error.InvalidOperand,
@@ -416,6 +450,7 @@ pub const Arg = union(enum) {
         };
     }
 
+    /// Converts the operand to an encoder 64-bit memory operand.
     pub fn as_mem64(self: Arg) !?encoder.RegisterMemory_64 {
         return switch (self) {
             .mem => |m| if (m.size == .qword) try m.encoderMem(encoder.RegisterMemory_64) else error.InvalidOperand,
@@ -423,6 +458,7 @@ pub const Arg = union(enum) {
         };
     }
 
+    /// Converts the operand to an 8-bit encoded immediate.
     pub fn as_imm8(self: Arg) !?u8 {
         return switch (self) {
             .imm => |v| try v.encode8(),
@@ -430,6 +466,7 @@ pub const Arg = union(enum) {
         };
     }
 
+    /// Converts the operand to a 16-bit encoded immediate.
     pub fn as_imm16(self: Arg) !?u16 {
         return switch (self) {
             .imm => |v| try v.encode16(),
@@ -437,6 +474,7 @@ pub const Arg = union(enum) {
         };
     }
 
+    /// Converts the operand to a 32-bit encoded immediate.
     pub fn as_imm32(self: Arg) !?u32 {
         return switch (self) {
             .imm => |v| try v.encode32(),
@@ -444,6 +482,7 @@ pub const Arg = union(enum) {
         };
     }
 
+    /// Converts the operand to a 64-bit encoded immediate.
     pub fn as_imm64(self: Arg) !?u64 {
         return switch (self) {
             .imm => |v| try v.encode64(),
@@ -451,37 +490,45 @@ pub const Arg = union(enum) {
         };
     }
 
+    /// Constructs a signed immediate operand.
     pub fn immediate(value: anytype) Arg {
         return .{ .imm = .{ .signed = @intCast(value) } };
     }
 
+    /// Constructs an unsigned immediate operand.
     pub fn unsigned(value: anytype) Arg {
         return .{ .imm = .{ .unsigned = @intCast(value) } };
     }
 
+    /// Constructs an 8-bit raw-bit-pattern immediate operand.
     pub fn raw8(value: u8) Arg {
         return .{ .imm = .{ .raw8 = value } };
     }
 
+    /// Constructs a 16-bit raw-bit-pattern immediate operand.
     pub fn raw16(value: u16) Arg {
         return .{ .imm = .{ .raw16 = value } };
     }
 
+    /// Constructs a 32-bit raw-bit-pattern immediate operand.
     pub fn raw32(value: u32) Arg {
         return .{ .imm = .{ .raw32 = value } };
     }
 
+    /// Constructs a 64-bit raw-bit-pattern immediate operand.
     pub fn raw64(value: u64) Arg {
         return .{ .imm = .{ .raw64 = value } };
     }
 };
 
+/// Generic sized memory operand used by the assembly API.
 pub const Memory = struct {
     size: MemSize,
     reg: RegM,
     disp: i64 = 0,
     index: ?Index = null,
 
+    /// Verifies that base and index registers use the same addressing width.
     pub fn validateIndex(self: Memory) !void {
         if (self.index) |index| {
             if (index.reg.is_register32() != self.reg.is_register32()) {
@@ -490,11 +537,13 @@ pub const Memory = struct {
         }
     }
 
+    /// Returns whether the memory operand uses 32-bit addressing registers.
     pub fn is_register32(self: Memory) !bool {
         try self.validateIndex();
         return self.reg.is_register32();
     }
 
+    /// Returns whether the memory operand uses 64-bit addressing registers.
     pub fn is_register64(self: Memory) !bool {
         try self.validateIndex();
         return self.reg.is_register64();
@@ -521,6 +570,7 @@ pub const Memory = struct {
     }
 };
 
+/// Width classification for register operands.
 pub const RegKind = enum {
     Reg64,
     Reg32,
@@ -528,6 +578,7 @@ pub const RegKind = enum {
     Reg8,
 };
 
+/// Base or index register used by generic memory operands.
 pub const RegM = enum {
     rax,
     eax,
@@ -562,6 +613,7 @@ pub const RegM = enum {
     r15,
     r15d,
 
+    /// Returns whether the register belongs to the 32-bit addressing set.
     pub fn is_register32(self: RegM) bool {
         return switch (self) {
             .eax, .ebx, .ecx, .edx, .esi, .edi, .ebp, .esp, .r8d, .r9d, .r10d, .r11d, .r12d, .r13d, .r14d, .r15d => true,
@@ -569,6 +621,7 @@ pub const RegM = enum {
         };
     }
 
+    /// Returns whether the register belongs to the 64-bit addressing set.
     pub fn is_register64(self: RegM) bool {
         return switch (self) {
             .rax, .rbx, .rcx, .rdx, .rsi, .rdi, .rbp, .rsp, .r8, .r9, .r10, .r11, .r12, .r13, .r14, .r15 => true,
@@ -621,11 +674,13 @@ pub const RegM = enum {
     }
 };
 
+/// Scaled index component for generic memory operands.
 pub const Index = struct {
     reg: RegM,
     scale: Scale = .x1,
 };
 
+/// Scale factor used by indexed addressing modes.
 pub const Scale = enum {
     x1,
     x2,

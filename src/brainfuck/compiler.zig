@@ -19,6 +19,7 @@ const restoreTerminal = helper.restoreTerminal;
 
 const Engine = @import("../asm/engine.zig").Engine;
 
+/// Native-code version of a Brainfuck program plus its executable mapping.
 pub const BrainFuckCompiled = @This();
 
 const FnType = fn (mem: *u8) callconv(.c) void;
@@ -29,6 +30,7 @@ allocator: std.mem.Allocator,
 program: FunctionLoader(FnType),
 raw: []u8,
 
+/// Compiles a lowered Brainfuck program to native x86-64 code and loads it into executable memory.
 pub fn compile(interpreted: *BrainfuckInterpreter) !BrainFuckCompiled {
     // Use the same allocator as the interpreter
     const allocator = interpreted.allocator;
@@ -55,6 +57,7 @@ pub fn compile(interpreted: *BrainfuckInterpreter) !BrainFuckCompiled {
     };
 }
 
+/// Executes a compiled Brainfuck program against `memory`.
 pub fn execute(compiled: *const BrainFuckCompiled, memory: []u8) !void {
     const func = compiled.program.f();
     const ptr: *u8 = &memory[0];
@@ -65,6 +68,7 @@ pub fn execute(compiled: *const BrainFuckCompiled, memory: []u8) !void {
     func(ptr);
 }
 
+/// Releases the executable mapping and owned machine-code bytes.
 pub fn deinit(compiled: BrainFuckCompiled) void {
     // Free the executable mapping and compiled bytecode copy.
     compiled.program.deinit();

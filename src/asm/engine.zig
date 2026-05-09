@@ -34,6 +34,7 @@ ops: std.ArrayList(ir.Op) = .empty,
 pub const Label = op_file.Label;
 pub const RetKind = ret_helper.RetKind;
 
+/// Creates a new engine that records instructions and allocates emitted bytes with `allocator`.
 pub fn init(allocator: std.mem.Allocator) Engine {
     return .{
         .allocator = allocator,
@@ -41,6 +42,7 @@ pub fn init(allocator: std.mem.Allocator) Engine {
     };
 }
 
+/// Releases the engine's internal allocations without producing machine code.
 pub fn deinit(self: *Engine) void {
     self.writer_alloc.deinit();
     self.labels.deinit(self.allocator);
@@ -48,20 +50,25 @@ pub fn deinit(self: *Engine) void {
     self.ops.deinit(self.allocator);
 }
 
+/// Returns the internal writer used during final machine code emission.
 pub fn writer(self: *Engine) *std.Io.Writer {
     return &self.writer_alloc.writer;
 }
 
+/// Returns the bytes emitted so far.
+/// This is mainly intended for tests and only reflects data written before `finalize`.
 pub fn bytes(self: *Engine) []const u8 {
     return self.writer_alloc.written();
 }
 
+/// Allocates a new label handle that can later be bound and used as a branch target.
 pub fn label(self: *Engine) !Label {
     const index = self.labels.items.len;
     try self.labels.append(self.allocator, .{});
     return .{ .index = index };
 }
 
+/// Records the current position as the definition of `label_`.
 pub fn bind(self: *Engine, label_: Label) !void {
     if (label_.index >= self.labels.items.len) return error.InvalidLabel;
     if (self.labels.items[label_.index].bound) return error.LabelAlreadyBound;
@@ -104,74 +111,92 @@ fn appendOp(self: *Engine, op: ir.Op) void {
 
 // Operations
 
+/// Records a `mov` instruction.
 pub fn mov(self: *Engine, dst: Arg, src: Arg) void {
     self.appendOp(.{ .mov = .{ .dst = dst, .src = src } });
 }
 
+/// Records an `add` instruction.
 pub fn add(self: *Engine, dst: Arg, src: Arg) void {
     self.appendOp(.{ .add = .{ .dst = dst, .src = src } });
 }
 
+/// Records a `sub` instruction.
 pub fn sub(self: *Engine, dst: Arg, src: Arg) void {
     self.appendOp(.{ .sub = .{ .dst = dst, .src = src } });
 }
 
+/// Records a `cmp` instruction.
 pub fn cmp(self: *Engine, dst: Arg, src: Arg) void {
     self.appendOp(.{ .cmp = .{ .dst = dst, .src = src } });
 }
 
+/// Records a `lea` instruction.
 pub fn lea(self: *Engine, dst: Arg, src: Arg) void {
     self.appendOp(.{ .lea = .{ .dst = dst, .src = src } });
 }
 
+/// Records an `and` instruction.
 pub fn @"and"(self: *Engine, dst: Arg, src: Arg) void {
     self.appendOp(.{ .@"and" = .{ .dst = dst, .src = src } });
 }
 
+/// Records an `or` instruction.
 pub fn @"or"(self: *Engine, dst: Arg, src: Arg) void {
     self.appendOp(.{ .@"or" = .{ .dst = dst, .src = src } });
 }
 
+/// Records an `xor` instruction.
 pub fn xor(self: *Engine, dst: Arg, src: Arg) void {
     self.appendOp(.{ .xor = .{ .dst = dst, .src = src } });
 }
 
+/// Records a `test` instruction.
 pub fn @"test"(self: *Engine, dst: Arg, src: Arg) void {
     self.appendOp(.{ .@"test" = .{ .dst = dst, .src = src } });
 }
 
+/// Records a `push` instruction.
 pub fn push(self: *Engine, operand: Arg) void {
     self.appendOp(.{ .push = operand });
 }
 
+/// Records a `pop` instruction.
 pub fn pop(self: *Engine, operand: Arg) void {
     self.appendOp(.{ .pop = operand });
 }
 
+/// Records an `inc` instruction.
 pub fn inc(self: *Engine, operand: Arg) void {
     self.appendOp(.{ .inc = operand });
 }
 
+/// Records a `dec` instruction.
 pub fn dec(self: *Engine, operand: Arg) void {
     self.appendOp(.{ .dec = operand });
 }
 
+/// Records a `jmp` instruction.
 pub fn jmp(self: *Engine, target: JumpTarget) void {
     self.appendOp(.{ .jmp = target });
 }
 
+/// Records a conditional branch instruction.
 pub fn jcc(self: *Engine, condition: Condition, target: JccTarget) void {
     self.appendOp(.{ .jcc = .{ .condition = condition, .target = target } });
 }
 
+/// Records a `call` instruction.
 pub fn call(self: *Engine, target: CallTarget) void {
     self.appendOp(.{ .call = target });
 }
 
+/// Records a near `ret` instruction.
 pub fn ret(self: *Engine) void {
     self.appendOp(.ret);
 }
 
+/// Records a `syscall` instruction.
 pub fn syscall(self: *Engine) void {
     self.appendOp(.syscall);
 }

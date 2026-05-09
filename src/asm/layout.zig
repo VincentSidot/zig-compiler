@@ -4,10 +4,13 @@ const ir = @import("ir.zig");
 const branch_helper = @import("helper/branch.zig");
 const lower = @import("lower.zig");
 
+/// Per-label metadata tracked during layout and fixup resolution.
 pub const LabelInfo = branch_helper.LabelInfo;
 
+/// Chosen branch encoding after layout relaxation.
 pub const BranchEncoding = ir.BranchEncoding;
 
+/// Instruction plus the layout metadata needed for emission.
 pub const ResolvedOp = struct {
     op: ir.Op,
     size: usize,
@@ -15,6 +18,7 @@ pub const ResolvedOp = struct {
     branch_encoding: ?BranchEncoding = null,
 };
 
+/// Resolves IR operations into sized instructions with default branch encodings.
 pub fn resolveOps(allocator: std.mem.Allocator, ops: []const ir.Op) ![]ResolvedOp {
     var resolved = std.ArrayList(ResolvedOp).empty;
     errdefer resolved.deinit(allocator);
@@ -30,6 +34,7 @@ pub fn resolveOps(allocator: std.mem.Allocator, ops: []const ir.Op) ![]ResolvedO
     return try resolved.toOwnedSlice(allocator);
 }
 
+/// Computes byte offsets for the provided instruction sequence and returns the total size.
 pub fn computeOffsets(ops: []ResolvedOp) usize {
     var offset: usize = 0;
 
@@ -41,6 +46,7 @@ pub fn computeOffsets(ops: []ResolvedOp) usize {
     return offset;
 }
 
+/// Records final label offsets from the resolved instruction stream.
 pub fn resolveLabels(labels: []LabelInfo, ops: []const ResolvedOp) !void {
     for (ops) |op| {
         switch (op.op) {
@@ -68,6 +74,7 @@ pub fn relaxLayout(allocator: std.mem.Allocator, ops: []ResolvedOp, labels: []La
     return step;
 }
 
+/// Shrinks relaxable label branches from `rel32` to `rel8` when the final displacement fits.
 pub fn relaxBranches(allocator: std.mem.Allocator, ops: []ResolvedOp, labels: []const LabelInfo) !bool {
     var changed = false;
 
@@ -83,6 +90,7 @@ pub fn relaxBranches(allocator: std.mem.Allocator, ops: []ResolvedOp, labels: []
     return changed;
 }
 
+/// Returns whether a resolved label branch can be encoded as `rel8`.
 pub fn canRelaxToRel8(op: ResolvedOp, labels: []const LabelInfo) !bool {
     const label = branchLabel(op.op) orelse return false;
     if (label.index >= labels.len) return error.InvalidLabel;

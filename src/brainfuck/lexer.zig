@@ -5,6 +5,7 @@ const tokenizer = @import("tokenizer.zig");
 const Position = helper.Position;
 const Token = tokenizer.Token;
 
+/// Normalized Brainfuck operations after collapsing adjacent source tokens.
 pub const LexerKind = union(enum) {
     move: i32,
     add: i32,
@@ -14,12 +15,14 @@ pub const LexerKind = union(enum) {
     loop_end,
 };
 
+/// Lowered Brainfuck instruction with position metadata.
 pub const Lexer = struct {
     kind: LexerKind,
     pos: Position,
     index: usize,
 };
 
+/// Lowers raw tokens into a compact instruction stream by merging adjacent moves and adds.
 pub fn lex(allocator: std.mem.Allocator, tokens: []const Token) ![]Lexer {
     var lexers = std.ArrayList(Lexer).empty;
     defer lexers.deinit(allocator);
