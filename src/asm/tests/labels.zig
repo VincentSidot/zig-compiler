@@ -2,7 +2,7 @@ const std = @import("std");
 
 const Engine = @import("../engine.zig");
 
-test "asm engine label branch emits rel32 placeholder" {
+test "asm engine label branch relaxes to rel8" {
     var engine = Engine.init(std.testing.allocator);
 
     const target = try engine.label();
@@ -11,7 +11,7 @@ test "asm engine label branch emits rel32 placeholder" {
 
     const bytes = try engine.finalize();
     defer std.testing.allocator.free(bytes);
-    try std.testing.expectEqualSlices(u8, &.{ 0xE9, 0x00, 0x00, 0x00, 0x00 }, bytes);
+    try std.testing.expectEqualSlices(u8, &.{ 0xEB, 0x00 }, bytes);
 }
 
 test "asm engine branch target forms" {

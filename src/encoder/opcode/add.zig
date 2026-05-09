@@ -74,18 +74,18 @@ pub const rm64_imm32 = factory_imm(
     .{ .mode = .modrm_group, .opcode = ADD_OPCODE.ADD_RM64_IMM32, .modrm_reg = 0b000 },
 );
 
-pub fn r8_imm8(writer: *Writer, dest: Register8, source: u8) EncodingError!usize {
+pub fn r8_imm8(writer: ?*Writer, dest: Register8, source: u8) EncodingError!usize {
     return rm8_imm8(writer, RegisterMemory8{ .reg = dest }, source);
 }
 
-pub fn r16_imm16(writer: *Writer, dest: Register16, source: u16) EncodingError!usize {
+pub fn r16_imm16(writer: ?*Writer, dest: Register16, source: u16) EncodingError!usize {
     return rm16_imm16(writer, RegisterMemory16{ .reg = dest }, source);
 }
 
-pub fn r32_imm32(writer: *Writer, dest: Register32, source: u32) EncodingError!usize {
+pub fn r32_imm32(writer: ?*Writer, dest: Register32, source: u32) EncodingError!usize {
     return rm32_imm32(writer, RegisterMemory32{ .reg = dest }, source);
 }
 
-pub fn r64_imm32(writer: *Writer, dest: Register64, source: u32) EncodingError!usize {
+pub fn r64_imm32(writer: ?*Writer, dest: Register64, source: u32) EncodingError!usize {
     return rm64_imm32(writer, RegisterMemory64{ .reg = dest }, source);
 }

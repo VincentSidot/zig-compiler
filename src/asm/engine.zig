@@ -1,25 +1,25 @@
 //! Tiny assembly engine for Intel x86-64 architecture.
 
 const std = @import("std");
+const log = std.log;
 
+// IR module
 const ir = @import("ir.zig");
+
+// Layout module
+const layout = @import("layout.zig");
+const lower = @import("lower.zig");
+
+// Operations module
 const op_file = @import("op.zig");
 pub const CallTarget = op_file.CallTarget;
 pub const Condition = op_file.Condition;
 pub const JccTarget = op_file.JccTarget;
 pub const JumpTarget = op_file.JumpTarget;
 pub const Arg = op_file.Arg;
-const add_helper = @import("helper/add.zig");
-const bit_helper = @import("helper/bit.zig");
+
 const branch_helper = @import("helper/branch.zig");
-const cmp_helper = @import("helper/cmp.zig");
-const lea_helper = @import("helper/lea.zig");
-const mov_helper = @import("helper/mov.zig");
 const ret_helper = @import("helper/ret.zig");
-const single_helper = @import("helper/single.zig");
-const sub_helper = @import("helper/sub.zig");
-const syscall_helper = @import("helper/syscall.zig");
-const xor_helper = @import("helper/xor.zig");
 
 pub const Engine = @This();
 
@@ -71,44 +71,31 @@ pub fn bind(self: *Engine, label_: Label) !void {
 }
 
 /// Resolves all fixups and returns the emitted machine code.
-/// Note: The engine will be deinitialized after this call, so it should not be used afterwards.
+/// Note: The engine will be deinitialized after this call, so it should be reinitialized to emit more code.
 pub fn finalize(self: *Engine) ![]u8 {
-    for (self.ops.items) |op| {
-        try self.emit(op);
+    const resolved = try layout.resolveOps(self.allocator, self.ops.items);
+    defer self.allocator.free(resolved);
+
+    const passes = try layout.relaxLayout(self.allocator, resolved, self.labels.items);
+
+    for (resolved) |resolved_op| {
+        try self.emit(resolved_op);
     }
 
     const emitted = try self.writer_alloc.toOwnedSlice();
     try branch_helper.resolve_fixups(emitted, self.fixups.items, self.labels.items);
     self.deinit();
 
+    log.debug("emitted {d} bytes in {d} passes", .{ emitted.len, passes });
+
     return emitted;
 }
 
-fn emit(self: *Engine, op: ir.Op) !void {
-    switch (op) {
-        .bind => |label_| {
-            if (label_.index >= self.labels.items.len) return error.InvalidLabel;
-            self.labels.items[label_.index].offset = self.written;
-        },
-        .mov => |x| try mov_helper.mov(self.writer(), &self.written, x.dst, x.src),
-        .add => |x| try add_helper.add(self.writer(), &self.written, x.dst, x.src),
-        .sub => |x| try sub_helper.sub(self.writer(), &self.written, x.dst, x.src),
-        .cmp => |x| try cmp_helper.cmp(self.writer(), &self.written, x.dst, x.src),
-        .lea => |x| try lea_helper.lea(self.writer(), &self.written, x.dst, x.src),
-        .@"and" => |x| try bit_helper.@"and"(self.writer(), &self.written, x.dst, x.src),
-        .@"or" => |x| try bit_helper.@"or"(self.writer(), &self.written, x.dst, x.src),
-        .xor => |x| try xor_helper.xor(self.writer(), &self.written, x.dst, x.src),
-        .@"test" => |x| try bit_helper.@"test"(self.writer(), &self.written, x.dst, x.src),
-        .push => |operand| try single_helper.push(self.writer(), &self.written, operand),
-        .pop => |operand| try single_helper.pop(self.writer(), &self.written, operand),
-        .inc => |operand| try single_helper.inc(self.writer(), &self.written, operand),
-        .dec => |operand| try single_helper.dec(self.writer(), &self.written, operand),
-        .jmp => |target| try branch_helper.jmp(self.writer(), &self.written, self.allocator, &self.fixups, target),
-        .jcc => |x| try branch_helper.jcc(self.writer(), &self.written, self.allocator, &self.fixups, x.condition, x.target),
-        .call => |target| try branch_helper.call(self.writer(), &self.written, self.allocator, &self.fixups, target),
-        .ret => try ret_helper.ret(self.writer(), &self.written, .Default),
-        .syscall => try syscall_helper.syscall(self.writer(), &self.written),
-    }
+fn emit(self: *Engine, resolved_op: layout.ResolvedOp) !void {
+    try lower.emit(resolved_op.op, resolved_op.branch_encoding, self.writer(), &self.written, .{
+        .allocator = self.allocator,
+        .fixups = &self.fixups,
+    });
 }
 
 fn appendOp(self: *Engine, op: ir.Op) void {

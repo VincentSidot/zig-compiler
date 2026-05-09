@@ -170,8 +170,6 @@ fn generate_code_2(allocator: std.mem.Allocator) ![]u8 {
 
     const bytecode = try engine.finalize();
 
-    log.info("Generated {d} bytes of machine code", .{bytecode.len});
-
     return bytecode;
 }
 

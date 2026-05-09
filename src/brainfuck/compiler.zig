@@ -190,8 +190,6 @@ fn compile_inner_engine(interpreted: *BrainfuckInterpreter) ![]u8 {
 
     const bytecode = try engine.finalize();
 
-    log.debug("Generated {d} bytes of machine code", .{bytecode.len});
-
     return bytecode;
 }
 

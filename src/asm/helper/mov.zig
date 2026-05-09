@@ -6,7 +6,7 @@ const Arg = op_file.Arg;
 const encoder = @import("../../encoder/lib.zig");
 const opcode = encoder.opcode;
 
-pub fn mov(writer: *std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void {
+pub fn mov(writer: ?*std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void {
     if (dst.is_register()) {
         if (src.is_register()) return movRegReg(writer, written, dst, src);
         if (src.is_immediate()) return movRegImm(writer, written, dst, src);
@@ -21,7 +21,7 @@ pub fn mov(writer: *std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void {
     return error.InvalidOperand;
 }
 
-fn movRegReg(writer: *std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void {
+fn movRegReg(writer: ?*std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void {
     const kind = dst.register() orelse return error.InvalidOperand;
     if (kind != (src.register() orelse return error.InvalidOperand)) return error.InvalidOperand;
 
@@ -33,7 +33,7 @@ fn movRegReg(writer: *std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void 
     };
 }
 
-fn movRegImm(writer: *std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void {
+fn movRegImm(writer: ?*std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void {
     const kind = dst.register() orelse return error.InvalidOperand;
 
     written.* += switch (kind) {
@@ -44,7 +44,7 @@ fn movRegImm(writer: *std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void 
     };
 }
 
-fn movRegMem(writer: *std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void {
+fn movRegMem(writer: ?*std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void {
     const kind = dst.register() orelse return error.InvalidOperand;
 
     written.* += switch (kind) {
@@ -55,7 +55,7 @@ fn movRegMem(writer: *std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void 
     };
 }
 
-fn movMemReg(writer: *std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void {
+fn movMemReg(writer: ?*std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void {
     const kind = src.register() orelse return error.InvalidOperand;
 
     written.* += switch (kind) {
@@ -66,7 +66,7 @@ fn movMemReg(writer: *std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void 
     };
 }
 
-fn movMemImm(writer: *std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void {
+fn movMemImm(writer: ?*std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void {
     const mem = switch (dst) {
         .mem => |mem| mem,
         else => return error.InvalidOperand,

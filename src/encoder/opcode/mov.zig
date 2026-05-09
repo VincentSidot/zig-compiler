@@ -155,7 +155,7 @@ pub const r64_imm64 = factory_imm(
 );
 
 pub fn r64_imm64_auto(
-    writer: *Writer,
+    writer: ?*Writer,
     dest: Register64,
     source: u64,
 ) EncodingError!usize {
@@ -177,7 +177,7 @@ pub fn r64_imm64_auto(
 }
 
 pub inline fn r8_r8(
-    writer: *Writer,
+    writer: ?*Writer,
     dest: Register8,
     source: Register8,
 ) EncodingError!usize {
@@ -189,7 +189,7 @@ pub inline fn r8_r8(
 }
 
 pub inline fn r16_r16(
-    writer: *Writer,
+    writer: ?*Writer,
     dest: Register16,
     source: Register16,
 ) EncodingError!usize {
@@ -201,7 +201,7 @@ pub inline fn r16_r16(
 }
 
 pub inline fn r32_r32(
-    writer: *Writer,
+    writer: ?*Writer,
     dest: Register32,
     source: Register32,
 ) EncodingError!usize {
@@ -213,7 +213,7 @@ pub inline fn r32_r32(
 }
 
 pub inline fn r64_r64(
-    writer: *Writer,
+    writer: ?*Writer,
     dest: Register64,
     source: Register64,
 ) EncodingError!usize {

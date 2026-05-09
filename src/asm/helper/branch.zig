@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const op_file = @import("../op.zig");
+const ir = @import("../ir.zig");
 const Arg = op_file.Arg;
 const CallTarget = op_file.CallTarget;
 const Condition = op_file.Condition;
@@ -38,14 +39,15 @@ pub const Fixup = struct {
 };
 
 pub fn jmp(
-    writer: *std.Io.Writer,
+    writer: ?*std.Io.Writer,
     written: *usize,
     allocator: std.mem.Allocator,
     fixups: *std.ArrayList(Fixup),
     target: JumpTarget,
+    encoding: ?ir.BranchEncoding,
 ) !void {
     switch (target) {
-        .label => |label| try rel32Label(writer, written, allocator, fixups, label, .jmp),
+        .label => |label| try jmpLabel(writer, written, allocator, fixups, label, encoding),
         .rel => |rel| written.* += try opcode.jmp.rel32(writer, rel),
         .reg => |reg| written.* += try opcode.jmp.r64(writer, reg.as_encoder()),
         .mem => |mem| {
@@ -56,7 +58,7 @@ pub fn jmp(
 }
 
 pub fn call(
-    writer: *std.Io.Writer,
+    writer: ?*std.Io.Writer,
     written: *usize,
     allocator: std.mem.Allocator,
     fixups: *std.ArrayList(Fixup),
@@ -74,35 +76,74 @@ pub fn call(
 }
 
 pub fn jcc(
-    writer: *std.Io.Writer,
+    writer: ?*std.Io.Writer,
     written: *usize,
     allocator: std.mem.Allocator,
     fixups: *std.ArrayList(Fixup),
     condition: Condition,
     target: JccTarget,
+    encoding: ?ir.BranchEncoding,
 ) !void {
     switch (target) {
-        .label => |label| try jccLabel(writer, written, allocator, fixups, condition, label),
+        .label => |label| try jccLabel(writer, written, allocator, fixups, condition, label, encoding),
         .rel => |rel| written.* += try opcode.jcc.rel32(writer, condition, rel),
     }
 }
 
+fn jmpLabel(
+    writer: ?*std.Io.Writer,
+    written: *usize,
+    allocator: std.mem.Allocator,
+    fixups: *std.ArrayList(Fixup),
+    target: Label,
+    encoding: ?ir.BranchEncoding,
+) !void {
+    const offset = written.*;
+    const size: FixupSize = switch (encoding orelse .rel32) {
+        .rel8 => blk: {
+            written.* += try opcode.jmp.rel8(writer, 0);
+            break :blk ._8;
+        },
+        .rel32 => blk: {
+            written.* += try opcode.jmp.rel32(writer, 0);
+            break :blk ._32;
+        },
+    };
+
+    try fixups.append(allocator, .{
+        .label = target,
+        .base_offset = offset,
+        .kind = .jmp,
+        .size = size,
+    });
+}
+
 fn jccLabel(
-    writer: *std.Io.Writer,
+    writer: ?*std.Io.Writer,
     written: *usize,
     allocator: std.mem.Allocator,
     fixups: *std.ArrayList(Fixup),
     condition: Condition,
     target: Label,
+    encoding: ?ir.BranchEncoding,
 ) !void {
-    // Use only 32-bit for now.
     const offset = written.*;
-    written.* += try opcode.jcc.rel32(writer, condition, 0);
+    const size: FixupSize = switch (encoding orelse .rel32) {
+        .rel8 => blk: {
+            written.* += try opcode.jcc.rel8(writer, condition, 0);
+            break :blk ._8;
+        },
+        .rel32 => blk: {
+            written.* += try opcode.jcc.rel32(writer, condition, 0);
+            break :blk ._32;
+        },
+    };
+
     try fixups.append(allocator, .{
         .label = target,
         .base_offset = offset,
         .kind = .jcc,
-        .size = ._32,
+        .size = size,
     });
 }
 
@@ -112,14 +153,13 @@ const Rel32Op = enum {
 };
 
 fn rel32Label(
-    writer: *std.Io.Writer,
+    writer: ?*std.Io.Writer,
     written: *usize,
     allocator: std.mem.Allocator,
     fixups: *std.ArrayList(Fixup),
     target: Label,
     op: Rel32Op,
 ) !void {
-    // Use only 32-bit for now.
     const offset = written.*;
     written.* += switch (op) {
         .jmp => try opcode.jmp.rel32(writer, 0),

@@ -6,7 +6,7 @@ const Arg = op_file.Arg;
 const encoder = @import("../../encoder/lib.zig");
 const opcode = encoder.opcode;
 
-pub fn push(writer: *std.Io.Writer, written: *usize, operand: Arg) !void {
+pub fn push(writer: ?*std.Io.Writer, written: *usize, operand: Arg) !void {
     if (operand.is_register()) {
         const kind = operand.register() orelse return error.InvalidOperand;
         written.* += switch (kind) {
@@ -50,7 +50,7 @@ pub fn push(writer: *std.Io.Writer, written: *usize, operand: Arg) !void {
     return error.InvalidOperand;
 }
 
-pub fn pop(writer: *std.Io.Writer, written: *usize, operand: Arg) !void {
+pub fn pop(writer: ?*std.Io.Writer, written: *usize, operand: Arg) !void {
     if (operand.is_register()) {
         const kind = operand.register() orelse return error.InvalidOperand;
         written.* += switch (kind) {
@@ -79,11 +79,11 @@ pub fn pop(writer: *std.Io.Writer, written: *usize, operand: Arg) !void {
     return error.InvalidOperand;
 }
 
-pub fn inc(writer: *std.Io.Writer, written: *usize, operand: Arg) !void {
+pub fn inc(writer: ?*std.Io.Writer, written: *usize, operand: Arg) !void {
     try incDec(.inc, writer, written, operand);
 }
 
-pub fn dec(writer: *std.Io.Writer, written: *usize, operand: Arg) !void {
+pub fn dec(writer: ?*std.Io.Writer, written: *usize, operand: Arg) !void {
     try incDec(.dec, writer, written, operand);
 }
 
@@ -92,7 +92,7 @@ const IncDecOp = enum {
     dec,
 };
 
-fn incDec(op: IncDecOp, writer: *std.Io.Writer, written: *usize, operand: Arg) !void {
+fn incDec(op: IncDecOp, writer: ?*std.Io.Writer, written: *usize, operand: Arg) !void {
     if (operand.is_register()) {
         const kind = operand.register() orelse return error.InvalidOperand;
         written.* += switch (kind) {

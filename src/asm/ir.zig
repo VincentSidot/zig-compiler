@@ -7,6 +7,11 @@ pub const JccTarget = op_file.JccTarget;
 pub const JumpTarget = op_file.JumpTarget;
 pub const Label = op_file.Label;
 
+pub const BranchEncoding = enum {
+    rel8,
+    rel32,
+};
+
 pub const Binary = struct {
     dst: Arg,
     src: Arg,

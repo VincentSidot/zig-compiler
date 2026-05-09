@@ -6,7 +6,7 @@ const Arg = op_file.Arg;
 const encoder = @import("../../encoder/lib.zig");
 const opcode = encoder.opcode;
 
-pub fn lea(writer: *std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void {
+pub fn lea(writer: ?*std.Io.Writer, written: *usize, dst: Arg, src: Arg) !void {
     if (!dst.is_register() or !src.is_memory()) {
         std.log.debug("asm lea: invalid operands dst={any}, src={any}", .{ dst, src });
         return error.InvalidOperand;
