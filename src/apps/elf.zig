@@ -3,8 +3,8 @@
 const std = @import("std");
 const log = std.log;
 
-const AsmEngine = @import("../asm/engine.zig").Engine;
-const ElfEngine = @import("../elf/engine.zig").Engine;
+const AsmEngine = @import("../backend/engine/engine.zig").Engine;
+const ElfEngine = @import("../backend/elf/engine.zig").Engine;
 
 /// Generates a tiny example ELF executable with one RX text segment and one RW data segment.
 pub fn generate(io: std.Io) !void {

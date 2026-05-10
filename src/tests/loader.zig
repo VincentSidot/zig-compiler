@@ -1,6 +1,6 @@
 const std = @import("std");
 const loader = @import("../loader.zig");
-const encoder = @import("../encoder/lib.zig");
+const encoder = @import("../backend/encoder/lib.zig");
 
 fn buildFibBytecode(allocator: std.mem.Allocator) ![]u8 {
     const op = encoder.opcode;

@@ -9,7 +9,7 @@ const logFunctionMake = helper.logFunctionMake;
 const printf = helper.printf;
 const eprintf = helper.eprintf;
 
-const Brainfuck = @import("../brainfuck/lib.zig");
+const Brainfuck = @import("../frontend/brainfuck/lib.zig");
 
 // Argument parsing logic
 const Args = @import("../args.zig").Args;
@@ -128,8 +128,8 @@ fn generate_elf(
     interpreter: *Brainfuck.BrainfuckInterpreter,
     output_path: []const u8,
 ) !void {
-    const AsmEngine = @import("../asm/engine.zig");
-    const ElfEngine = @import("../elf/engine.zig");
+    const AsmEngine = @import("../backend/engine/engine.zig");
+    const ElfEngine = @import("../backend/elf/engine.zig");
 
     log.debug("Compile brainfuck code to machine code for ELF generation...\n", .{});
     var asm_engine = AsmEngine.init(allocator);
@@ -141,10 +141,11 @@ fn generate_elf(
     const ENTRY_LABEL = try asm_engine.label();
 
     // Generate the code
-
     asm_engine.mov(.rdi, .{
         .sym = .{ .id = TAPE_SYM, .kind = .abs64 },
     });
+    // Align the stack to 16 bytes for the call instruction
+    asm_engine.@"and"(.rsp, .immediate(-16));
     // Call the entry point of the compiled brainfuck code
     asm_engine.call(.{ .label = ENTRY_LABEL });
     // Now exit cleanly with syscall exit(0)

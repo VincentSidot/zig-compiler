@@ -8,14 +8,14 @@ const log = std.log;
 const loader = @import("../loader.zig");
 
 // Encoder
-const encoder = @import("../encoder/lib.zig");
+const encoder = @import("../backend/encoder/lib.zig");
 const op = encoder.opcode;
 const reg = encoder.register;
 const extractBits = encoder.extractBits;
 const RegisterMemory64 = encoder.RegisterMemory_64;
 
 // Assembly engine
-const Engine = @import("../asm/engine.zig");
+const Engine = @import("../backend/engine/engine.zig");
 
 fn generate_code_legacy(allocator: std.mem.Allocator) ![]u8 {
     var writter_alloc = std.Io.Writer.Allocating.init(allocator);
